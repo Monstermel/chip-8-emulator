@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 4.1)
 
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "Vcpkg toolchain file")
+endif()
+
 project(
     chip-8 
     LANGUAGES CXX
@@ -19,8 +24,7 @@ target_include_directories(_headers
         ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
-add_subdirectory(thirdparty/SDL)
-
+find_package(SDL3 CONFIG REQUIRED)
 target_link_libraries(_headers
     PUBLIC 
         SDL3::SDL3
@@ -49,6 +53,6 @@ if(CHIP_8_ENABLE_TESTS)
     
     include(CTest)
 
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/thirdparty/googletest)
+    find_package(GTest CONFIG REQUIRED)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/test/)
 endif()

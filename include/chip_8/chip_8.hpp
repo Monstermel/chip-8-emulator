@@ -9,6 +9,7 @@
 #include "chip_8/chip_state.hpp"
 #include "chip_8/display.hpp"
 #include "chip_8/error.hpp"
+#include "chip_8/frontend.hpp"
 #include "chip_8/instruction_set.hpp"
 #include "chip_8/utility.hpp"
 
@@ -21,9 +22,9 @@ namespace emu {
 
 class Chip8 {
     ChipState state_;
-    // Move this a frontend class
-    SDL_Window* window_{};
-    SDL_Renderer* renderer_{};
+    Frontend frontend_;
+
+    // RODO: Move most of it into a backend class so Chip8 act only as a facade
 
     /**
      * @brief Fetch an instruction from memory and update program counter
@@ -187,32 +188,6 @@ class Chip8 {
         }
     }
 
-    void renderDisplay() {
-        // Clear screen to black
-        SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
-        SDL_RenderClear(renderer_);
-
-        // Set drawing color to white (CHIP-8 foreground)
-        SDL_SetRenderDrawColor(renderer_, 255, 255, 255, 255);
-
-        // Draw pixels
-        for (std::size_t y = 0; y < display::kHeight; y++) {
-            for (std::size_t x = 0; x < display::kWidth; x++) {
-                if (state_.display.buffer[x + (y * display::kWidth)] != 0U) {
-                    // REVIEW: How expensive are these casts?
-                    SDL_RenderPoint(renderer_, static_cast<float>(x),
-                                    static_cast<float>(y));
-                }
-            }
-        }
-
-        // Update screen
-        SDL_RenderPresent(renderer_);
-
-        // Reset draw flag
-        state_.display.draw = false;
-    }
-
    public:
     /**
      * @brief Load test ROM into memory
@@ -220,24 +195,6 @@ class Chip8 {
      * @return 0 at success, -1 at failure
      */
     int load();
-
-    bool init() {
-        if (!SDL_CreateWindowAndRenderer(
-                "Chip-8", display::kWidth * 10, display::kHeight * 10,
-                SDL_WINDOW_RESIZABLE, &window_, &renderer_)) {
-            return false;
-        }
-        if (!SDL_SetRenderScale(renderer_, 10.0F, 10.0F)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    void shutdown() {
-        SDL_DestroyRenderer(renderer_);
-        SDL_DestroyWindow(window_);
-    }
 
     /**
      * @brief Represet a single interpreter cycle
@@ -264,7 +221,8 @@ class Chip8 {
         }
 
         if (state_.display.draw) {
-            renderDisplay();
+            frontend_.renderDisplay(state_.display);
+            state_.display.draw = false;
         }
 
         const auto kFinish = std::chrono::system_clock::now();

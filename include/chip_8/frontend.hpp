@@ -1,9 +1,11 @@
 #ifndef CHIP_8_FRONTEND_HPP
 #define CHIP_8_FRONTEND_HPP
 
+#include <array>
 #include <memory>
 #include <stdexcept>
 
+#include "SDL3/SDL_audio.h"
 #include "chip_8/display.hpp"
 
 #include "SDL3/SDL_render.h"
@@ -13,31 +15,95 @@ namespace emu {
 
 // Bridge between emulator backend and emulator frotend (aka SDL)
 class Frontend {
-    using WindowDeleter =
-        decltype([](SDL_Window* window) { SDL_DestroyWindow(window); });
-    std::unique_ptr<SDL_Window, WindowDeleter> window_;
+    using WindowHandler =
+        std::unique_ptr<SDL_Window, decltype([](SDL_Window* window) {
+                            SDL_DestroyWindow(window);
+                        })>;
+    WindowHandler window_;
 
-    using RendererDeleter =
-        decltype([](SDL_Renderer* renderer) { SDL_DestroyRenderer(renderer); });
-    std::unique_ptr<SDL_Renderer, RendererDeleter> renderer_;
+    using RendererHandler =
+        std::unique_ptr<SDL_Renderer, decltype([](SDL_Renderer* renderer) {
+                            SDL_DestroyRenderer(renderer);
+                        })>;
+    RendererHandler renderer_;
 
-   public:
-    Frontend() {
-        SDL_Window* raw_window{};
-        SDL_Renderer* raw_renderer{};
-        if (!SDL_CreateWindowAndRenderer(
-                "Chip-8", display::kWidth * 10, display::kHeight * 10,
-                SDL_WINDOW_RESIZABLE, &raw_window, &raw_renderer)) {
+    using AudioStreamHandler =
+        std::unique_ptr<SDL_AudioStream,
+                        decltype([](SDL_AudioStream* audio_stream) {
+                            SDL_DestroyAudioStream(audio_stream);
+                        })>;
+    AudioStreamHandler audio_stream_;
+    bool audio_running_{false};
+
+    static auto makeWindow() {
+        SDL_Window* raw_window =
+            SDL_CreateWindow("Chip-8", display::kWidth * 10,
+                             display::kHeight * 10, SDL_WINDOW_RESIZABLE);
+        if (raw_window == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
 
-        window_ = decltype(window_)(raw_window);
-        renderer_ = decltype(renderer_)(raw_renderer);
+        return WindowHandler{raw_window};
+    }
 
+    static auto makeRenderer(SDL_Window* window) {
+        SDL_Renderer* raw_renderer = SDL_CreateRenderer(window, nullptr);
+        if (raw_renderer == nullptr) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
+        return RendererHandler{raw_renderer};
+    }
+
+    static auto makeAudioStream() {
+        SDL_AudioSpec spec{.format = SDL_AUDIO_U8, .channels = 1, .freq = 8000};
+
+        // 8000Hz / 440Hz = 18.1818... samples per cycle.
+        // 800 samples is exactly 44 cycles, which perfectly loops without
+        // clicking.
+        static constexpr auto kAudioBuffer = []() consteval {
+            std::array<std::uint8_t, 800> arr{};
+            float phase = 0.0F;
+            for (int i = 0; i < 800; ++i) {
+                phase += 440.0F / 8000.0F;
+                if (phase > 1.0F) {
+                    phase -= 1.0F;
+                }
+                // SDL_AUDIO_U8 silence is 128. Amplitude of 32 -> 160 and 96
+                arr[i] = (phase < 0.5F) ? 160 : 96;
+            }
+            return arr;
+        }();
+
+        auto callback = [](void* /*userdata*/, SDL_AudioStream* stream,
+                           int additional_amount, int /*total_amount*/) {
+            // Push complete 800-byte chunks (exactly 44 cycles).
+            // By always pushing complete cycles, we avoid needing any state!
+            while (additional_amount > 0) {
+                SDL_PutAudioStreamData(stream, kAudioBuffer.data(),
+                                       kAudioBuffer.size());
+                additional_amount -= kAudioBuffer.size();
+            }
+        };
+
+        SDL_AudioStream* raw_audio_stream = SDL_OpenAudioDeviceStream(
+            SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, callback, nullptr);
+        if (raw_audio_stream == nullptr) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
+        return AudioStreamHandler{raw_audio_stream};
+    }
+
+   public:
+    Frontend()
+        : window_(makeWindow()),
+          renderer_(makeRenderer(window_.get())),
+          audio_stream_(makeAudioStream()) {
         if (!SDL_SetRenderScale(renderer_.get(), 10.0F, 10.0F)) {
             throw std::runtime_error(SDL_GetError());
         }
-    };
+    }
 
     // TODO: Add batch drawing
     void renderDisplay(const display::Type& display) {
@@ -62,8 +128,25 @@ class Frontend {
         // Update screen
         SDL_RenderPresent(renderer_.get());
     }
-};
+
+    void handleSound(std::uint8_t& sound_timer) {
+        if (sound_timer > 0) {
+            if (!audio_running_) {
+                SDL_ResumeAudioStreamDevice(audio_stream_.get());
+                audio_running_ = true;
+            }
+
+            sound_timer -= 1;
+        } else {
+            if (audio_running_) {
+                SDL_PauseAudioStreamDevice(audio_stream_.get());
+                audio_running_ = false;
+            }
+        }
+    };
 
 };  // namespace emu
+
+}  // namespace emu
 
 #endif /* CHIP_8_FRONTEND_HPP */

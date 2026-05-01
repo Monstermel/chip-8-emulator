@@ -15,13 +15,17 @@ static std::unique_ptr<emu::Chip8> g_interpreter;
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void** /*appstate*/, int /*argc*/, char* /*argv*/[]) {
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+        SDL_LogError(SDL_LOG_CATEGORY_SYSTEM, "Failed to init sdl: %s",
+                     SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
     try {
         g_interpreter = std::make_unique<emu::Chip8>();
-    } catch (...) {
+    } catch (const std::exception& error) {
+        SDL_LogError(SDL_LOG_CATEGORY_SYSTEM, "Failed to init emulator: %s",
+                     error.what());
         return SDL_APP_FAILURE;
     }
 

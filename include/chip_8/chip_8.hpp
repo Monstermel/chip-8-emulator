@@ -215,10 +215,7 @@ class Chip8 {
             state_.delay_timer -= 1;
         }
 
-        if (state_.sound_timer > 0) {
-            // Make a beep
-            state_.sound_timer -= 1;
-        }
+        frontend_.handleSound(state_.sound_timer);
 
         if (state_.display.draw) {
             frontend_.renderDisplay(state_.display);

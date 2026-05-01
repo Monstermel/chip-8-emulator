@@ -8,6 +8,7 @@
 
 namespace emu {
 
+// TODO: Add cxxopts
 int Chip8::load() {
     // Open test ROM
     std::ifstream file("roms/snake.ch8",

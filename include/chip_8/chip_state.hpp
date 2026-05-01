@@ -1,6 +1,7 @@
 #ifndef CHIP_8_CHIP_STATE_HPP
 #define CHIP_8_CHIP_STATE_HPP
 
+#include <atomic>
 #include <cstdint>
 #include <random>
 #include <stack>
@@ -48,9 +49,9 @@ struct ChipState {
     // Index register
     std::uint16_t index_register{};
     // Delay Timer
-    std::uint8_t delay_timer{};
+    std::atomic<std::uint8_t> delay_timer{0};
     // Sound Timer
-    std::uint8_t sound_timer{};
+    std::atomic<std::uint8_t> sound_timer{0};
 
     // Keyboard state
     keyboard::Type keyboard{};

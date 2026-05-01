@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 #include <exception>
 #include <memory>
 
@@ -12,6 +13,7 @@
 #include "SDL3/SDL_main.h"
 
 static std::unique_ptr<emu::Chip8> g_interpreter;
+static auto g_last_time = std::chrono::high_resolution_clock::now();
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void** /*appstate*/, int /*argc*/, char* /*argv*/[]) {
@@ -47,8 +49,12 @@ SDL_AppResult SDL_AppEvent(void* /*appstate*/, SDL_Event* event) {
 
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void* /*appstate*/) {
+    auto now = std::chrono::high_resolution_clock::now();
+    auto dt = now - g_last_time;
+    g_last_time = now;
+
     try {
-        g_interpreter->cycle();
+        g_interpreter->cycle(dt);
     } catch (const std::exception& error) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Chip8::cycle failed: %s",
                      error.what());

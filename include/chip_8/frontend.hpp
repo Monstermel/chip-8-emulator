@@ -2,8 +2,10 @@
 #define CHIP_8_FRONTEND_HPP
 
 #include <array>
+#include <atomic>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 
 #include "SDL3/SDL_audio.h"
 #include "chip_8/display.hpp"
@@ -33,6 +35,9 @@ class Frontend {
                             SDL_DestroyAudioStream(audio_stream);
                         })>;
     AudioStreamHandler audio_stream_;
+
+    std::jthread frontend_thread_;
+
     bool audio_running_{false};
 
     static auto makeWindow() {
@@ -118,7 +123,6 @@ class Frontend {
         for (std::size_t y = 0; y < display::kHeight; y++) {
             for (std::size_t x = 0; x < display::kWidth; x++) {
                 if (display.buffer[x + (y * display::kWidth)] != 0U) {
-                    // REVIEW: How expensive are these casts?
                     SDL_RenderPoint(renderer_.get(), static_cast<float>(x),
                                     static_cast<float>(y));
                 }
@@ -129,7 +133,7 @@ class Frontend {
         SDL_RenderPresent(renderer_.get());
     }
 
-    void handleSound(std::uint8_t& sound_timer) {
+    void handleSound(std::atomic<std::uint8_t>& sound_timer) {
         if (sound_timer > 0) {
             if (!audio_running_) {
                 SDL_ResumeAudioStreamDevice(audio_stream_.get());

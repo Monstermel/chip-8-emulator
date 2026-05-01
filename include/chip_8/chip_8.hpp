@@ -1,6 +1,7 @@
 #ifndef CHIP_8_CHIP_8_HPP
 #define CHIP_8_CHIP_8_HPP
 
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -23,6 +24,8 @@ namespace emu {
 class Chip8 {
     ChipState state_;
     Frontend frontend_;
+    std::jthread timer_thread_;
+    std::chrono::nanoseconds accumulator_{0};
 
     // RODO: Move most of it into a backend class so Chip8 act only as a facade
 
@@ -189,6 +192,24 @@ class Chip8 {
     }
 
    public:
+    Chip8()
+        : timer_thread_([this](const std::stop_token& token) {
+              while (!token.stop_requested()) {
+                  if (state_.delay_timer > 0) {
+                      state_.delay_timer -= 1;
+                  }
+                  frontend_.handleSound(state_.sound_timer);
+
+                  if (state_.display.draw) {
+                      frontend_.renderDisplay(state_.display);
+                      state_.display.draw = false;
+                  }
+
+                  using namespace std::chrono_literals;
+                  std::this_thread::sleep_for(16666us);  // ~60 Hz
+              }
+          }) {}
+
     /**
      * @brief Load test ROM into memory
      *
@@ -200,36 +221,20 @@ class Chip8 {
      * @brief Represet a single interpreter cycle
      *
      */
-    void cycle() {
-        const auto kStart = std::chrono::system_clock::now();
+    void cycle(std::chrono::nanoseconds dt) {
+        // 1. Accumulate time for instructions (700Hz = ~1,428,571 ns per
+        // instruction)
+        accumulator_ += dt;
+        while (accumulator_ >= std::chrono::nanoseconds(1428571)) {
+            accumulator_ -= std::chrono::nanoseconds(1428571);
 
-        state_.keyboard = SDL_GetKeyboardState(NULL);
+            state_.keyboard = SDL_GetKeyboardState(NULL);
 
-        const auto kBytecode = fetch();
+            const auto kBytecode = fetch();
 
-        const auto kInstruction = decode(kBytecode);
+            const auto kInstruction = decode(kBytecode);
 
-        kInstruction(state_, kBytecode);
-
-        if (state_.delay_timer > 0) {
-            state_.delay_timer -= 1;
-        }
-
-        frontend_.handleSound(state_.sound_timer);
-
-        if (state_.display.draw) {
-            frontend_.renderDisplay(state_.display);
-            state_.display.draw = false;
-        }
-
-        const auto kFinish = std::chrono::system_clock::now();
-
-        using namespace std::chrono_literals;
-
-        constexpr auto kTargetTime = 1.43ms;
-        const auto kTotalTime = kFinish - kStart;
-        if (kTotalTime < kTargetTime) {
-            std::this_thread::sleep_for(kTargetTime - kTotalTime);
+            kInstruction(state_, kBytecode);
         }
     }
 };

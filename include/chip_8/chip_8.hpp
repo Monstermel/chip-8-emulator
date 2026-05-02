@@ -5,7 +5,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <thread>
+#include <fstream>
+#include <ios>
+#include <iterator>
 
 #include "chip_8/chip_state.hpp"
 #include "chip_8/display.hpp"
@@ -24,8 +26,6 @@ namespace emu {
 class Chip8 {
     ChipState state_;
     Frontend frontend_;
-    std::jthread timer_thread_;
-    std::chrono::nanoseconds accumulator_{0};
 
     // RODO: Move most of it into a backend class so Chip8 act only as a facade
 
@@ -192,49 +192,70 @@ class Chip8 {
     }
 
    public:
-    Chip8()
-        : timer_thread_([this](const std::stop_token& token) {
-              while (!token.stop_requested()) {
-                  if (state_.delay_timer > 0) {
-                      state_.delay_timer -= 1;
-                  }
-                  frontend_.handleSound(state_.sound_timer);
-
-                  if (state_.display.draw) {
-                      frontend_.renderDisplay(state_.display);
-                      state_.display.draw = false;
-                  }
-
-                  using namespace std::chrono_literals;
-                  std::this_thread::sleep_for(16666us);  // ~60 Hz
-              }
-          }) {}
-
     /**
      * @brief Load test ROM into memory
      *
      * @return 0 at success, -1 at failure
      */
-    int load();
+    int load(const std::string& path) {
+        // Open ROM
+        std::ifstream file(path,
+                           // NOLINTNEXTLINE (hicpp-signed-bitwise)
+                           std::ifstream::ate | std::ifstream::binary);
+        if (!file.is_open()) {
+            return -1;
+        }
+
+        // Get size of file
+        std::streamsize size = file.tellg();
+        // Set file at beggining
+        file.seekg(std::ifstream::beg);
+
+        // Load test ROM into memory at kProgramSpaceOffset
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
+        if (!file.read(std::next(reinterpret_cast<char*>(state_.memory.data()),
+                                 memory::kProgramSpaceOffset),
+                       size)) {
+            return -1;
+        }
+
+        return 0;
+    }
 
     /**
      * @brief Represet a single interpreter cycle
      *
      */
-    void cycle(std::chrono::nanoseconds dt) {
-        // 1. Accumulate time for instructions (700Hz = ~1,428,571 ns per
-        // instruction)
-        accumulator_ += dt;
-        while (accumulator_ >= std::chrono::nanoseconds(1428571)) {
-            accumulator_ -= std::chrono::nanoseconds(1428571);
+    void cycle(const std::chrono::nanoseconds& delta) {
+        static std::chrono::nanoseconds accumulator{0};
+        // 1. CPU: ~700 Hz (1,428,571 ns per instruction)
+        accumulator += delta;
+        while (accumulator >= std::chrono::nanoseconds(1'428'571)) {
+            accumulator -= std::chrono::nanoseconds(1'428'571);
 
             state_.keyboard = SDL_GetKeyboardState(NULL);
 
             const auto kBytecode = fetch();
-
             const auto kInstruction = decode(kBytecode);
 
             kInstruction(state_, kBytecode);
+        }
+
+        static std::chrono::nanoseconds timer_accumulator{0};
+        // 2. Timers & Graphics: 60 Hz (16,666,666 ns per tick)
+        timer_accumulator += delta;
+        while (timer_accumulator >= std::chrono::nanoseconds(16'666'666)) {
+            timer_accumulator -= std::chrono::nanoseconds(16'666'666);
+
+            if (state_.delay_timer > 0) {
+                state_.delay_timer -= 1;
+            }
+            frontend_.handleSound(state_.sound_timer);
+
+            if (state_.display.draw) {
+                frontend_.renderDisplay(state_.display);
+                state_.display.draw = false;
+            }
         }
     }
 };

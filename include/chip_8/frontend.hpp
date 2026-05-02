@@ -5,7 +5,6 @@
 #include <atomic>
 #include <memory>
 #include <stdexcept>
-#include <thread>
 
 #include "SDL3/SDL_audio.h"
 #include "chip_8/display.hpp"
@@ -35,8 +34,6 @@ class Frontend {
                             SDL_DestroyAudioStream(audio_stream);
                         })>;
     AudioStreamHandler audio_stream_;
-
-    std::jthread frontend_thread_;
 
     bool audio_running_{false};
 

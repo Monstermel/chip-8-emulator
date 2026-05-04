@@ -1,261 +1,84 @@
 #ifndef CHIP_8_CHIP_8_HPP
 #define CHIP_8_CHIP_8_HPP
 
-#include <atomic>
 #include <chrono>
-#include <cstddef>
-#include <cstdint>
-#include <fstream>
-#include <ios>
-#include <iterator>
+#include <filesystem>
 
-#include "chip_8/chip_state.hpp"
-#include "chip_8/display.hpp"
-#include "chip_8/error.hpp"
+#include "chip_8/backend.hpp"
+#include "chip_8/env.hpp"
 #include "chip_8/frontend.hpp"
-#include "chip_8/instruction_set.hpp"
-#include "chip_8/utility.hpp"
 
+#include "SDL3/SDL_events.h"
 #include "SDL3/SDL_keyboard.h"
-#include "SDL3/SDL_log.h"
-#include "SDL3/SDL_render.h"
-#include "SDL3/SDL_video.h"
 
 namespace emu {
 
 class Chip8 {
-    ChipState state_;
+    Env env_;
+    Backend backend_;
     Frontend frontend_;
-
-    // RODO: Move most of it into a backend class so Chip8 act only as a facade
-
-    /**
-     * @brief Fetch an instruction from memory and update program counter
-     *
-     * @return instruction in bytecode format
-     */
-    std::uint16_t fetch() noexcept {
-        const auto kInstruction =
-            (static_cast<unsigned int>(state_.memory[state_.program_counter])
-             << kByteWidth) |
-            static_cast<unsigned int>(
-                state_.memory[state_.program_counter + 1]);
-
-        state_.program_counter += 2;
-
-        return static_cast<std::uint16_t>(kInstruction);
-    }
-
-    /**
-     * @brief Map bytecode to its instruction under 0xxx group
-     *
-     * @param bytecode
-     * @return instruction_set::Instruction
-     */
-    static instruction_set::Instruction handleGroup0(
-        const std::uint16_t bytecode) {
-        switch (bytecode & 0x0FFFU) {
-            case 0x00E0:
-                return instruction_set::op00E0;
-            case 0x00EE:
-                return instruction_set::op00EE;
-            default:
-                return instruction_set::op0nnn;
-        }
-    }
-
-    /**
-     * @brief Map bytecode to its instruction under 8xxx group
-     *
-     * @param bytecode
-     * @return instruction_set::Instruction
-     */
-    static instruction_set::Instruction handleGroup8(
-        const std::uint16_t bytecode) {
-        switch (bytecode & 0x000FU) {
-            case 0x0000:
-                return instruction_set::op8xy0;
-            case 0x0001:
-                return instruction_set::op8xy1;
-            case 0x0002:
-                return instruction_set::op8xy2;
-            case 0x0003:
-                return instruction_set::op8xy3;
-            case 0x0004:
-                return instruction_set::op8xy4;
-            case 0x0005:
-                return instruction_set::op8xy5;
-            case 0x0006:
-                return instruction_set::op8xy6;
-            case 0x0007:
-                return instruction_set::op8xy7;
-            case 0x000E:
-                return instruction_set::op8xyE;
-            default:
-                throw InvalidInstructionError(bytecode);
-        }
-    }
-
-    /**
-     * @brief Map bytecode to its instruction under Exxx group
-     *
-     * @param bytecode
-     * @return instruction_set::Instruction
-     */
-    static instruction_set::Instruction handleGroupE(
-        const std::uint16_t bytecode) {
-        switch (bytecode & 0x00FFU) {
-            case 0x009E:
-                return instruction_set::opEx9E;
-            case 0x00A1:
-                return instruction_set::opExA1;
-            default:
-                throw InvalidInstructionError(bytecode);
-        }
-    }
-
-    /**
-     * @brief Map bytecode to its instruction under Fxxx group
-     *
-     * @param bytecode
-     * @return instruction_set::Instruction
-     */
-    static instruction_set::Instruction handleGroupF(
-        const std::uint16_t bytecode) {
-        switch (bytecode & 0x00FFU) {
-            case 0x0007:
-                return instruction_set::opFx07;
-            case 0x000A:
-                return instruction_set::opFx0A;
-            case 0x0015:
-                return instruction_set::opFx15;
-            case 0x0018:
-                return instruction_set::opFx18;
-            case 0x001E:
-                return instruction_set::opFx1E;
-            case 0x0029:
-                return instruction_set::opFx29;
-            case 0x0033:
-                return instruction_set::opFx33;
-            case 0x0055:
-                return instruction_set::opFx55;
-            case 0x0065:
-                return instruction_set::opFx65;
-            default:
-                throw InvalidInstructionError(bytecode);
-        }
-    }
-
-    /**
-     * @brief Map a bytecode to its corresponding instruction
-     *
-     * @param instruction
-     * @return instruction_set::Instruction
-     */
-    static instruction_set::Instruction decode(const std::uint16_t bytecode) {
-        switch (bytecode & 0xF000U) {
-            case 0x0000:
-                return handleGroup0(bytecode);
-            case 0x1000:
-                return instruction_set::op1nnn;
-            case 0x2000:
-                return instruction_set::op2nnn;
-            case 0x3000:
-                return instruction_set::op3xkk;
-            case 0x4000:
-                return instruction_set::op4xkk;
-            case 0x5000:
-                return instruction_set::op5xy0;
-            case 0x6000:
-                return instruction_set::op6xkk;
-            case 0x7000:
-                return instruction_set::op7xkk;
-            case 0x8000:
-                return handleGroup8(bytecode);
-            case 0x9000:
-                return instruction_set::op9xy0;
-            case 0xA000:
-                return instruction_set::opAnnn;
-            case 0xB000:
-                return instruction_set::opBnnn;
-            case 0xC000:
-                return instruction_set::opCxkk;
-            case 0xD000:
-                return instruction_set::opDxyn;
-            case 0xE000:
-                return handleGroupE(bytecode);
-            case 0xF000:
-                return handleGroupF(bytecode);
-            default:
-                throw InvalidInstructionError(bytecode);
-        }
-    }
+    std::chrono::nanoseconds step_accumulator_{0};
+    std::chrono::nanoseconds timer_accumulator_{0};
 
    public:
     /**
-     * @brief Load test ROM into memory
-     *
-     * @return 0 at success, -1 at failure
+     * @brief Load ROM into the backend
      */
-    int load(const std::string& path) {
-        // Open ROM
-        std::ifstream file(path,
-                           // NOLINTNEXTLINE (hicpp-signed-bitwise)
-                           std::ifstream::ate | std::ifstream::binary);
-        if (!file.is_open()) {
-            return -1;
-        }
-
-        // Get size of file
-        std::streamsize size = file.tellg();
-        // Set file at beggining
-        file.seekg(std::ifstream::beg);
-
-        // Load test ROM into memory at kProgramSpaceOffset
-        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
-        if (!file.read(std::next(reinterpret_cast<char*>(state_.memory.data()),
-                                 memory::kProgramSpaceOffset),
-                       size)) {
-            return -1;
-        }
-
-        return 0;
-    }
+    void load(const std::filesystem::path& path) { backend_.load(path); }
 
     /**
-     * @brief Represet a single interpreter cycle
+     * @brief Coordinate a single interpreter cycle
      *
      */
     void cycle(const std::chrono::nanoseconds& delta) {
-        static std::chrono::nanoseconds accumulator{0};
         // 1. CPU: ~700 Hz (1,428,571 ns per instruction)
-        accumulator += delta;
-        while (accumulator >= std::chrono::nanoseconds(1'428'571)) {
-            accumulator -= std::chrono::nanoseconds(1'428'571);
+        step_accumulator_ += delta;
+        while (step_accumulator_ >= std::chrono::nanoseconds(1'428'571)) {
+            step_accumulator_ -= std::chrono::nanoseconds(1'428'571);
 
-            state_.keyboard = SDL_GetKeyboardState(NULL);
+            backend_.setKeyboard(SDL_GetKeyboardState(NULL));
 
-            const auto kBytecode = fetch();
-            const auto kInstruction = decode(kBytecode);
-
-            kInstruction(state_, kBytecode);
+            backend_.step();
         }
 
-        static std::chrono::nanoseconds timer_accumulator{0};
         // 2. Timers & Graphics: 60 Hz (16,666,666 ns per tick)
-        timer_accumulator += delta;
-        while (timer_accumulator >= std::chrono::nanoseconds(16'666'666)) {
-            timer_accumulator -= std::chrono::nanoseconds(16'666'666);
+        timer_accumulator_ += delta;
+        while (timer_accumulator_ >= std::chrono::nanoseconds(16'666'666)) {
+            timer_accumulator_ -= std::chrono::nanoseconds(16'666'666);
 
-            if (state_.delay_timer > 0) {
-                state_.delay_timer -= 1;
-            }
-            frontend_.handleSound(state_.sound_timer);
+            backend_.updateDelayTimer();
 
-            if (state_.display.draw) {
-                frontend_.renderDisplay(state_.display);
-                state_.display.draw = false;
+            frontend_.handleSound(backend_.getSoundTimer());
+
+            auto& display = backend_.getDisplay();
+            if (display.draw) {
+                frontend_.renderDisplay(display);
+                display.draw = false;
             }
+        }
+    }
+
+    /**
+     * @brief Start the interpreter loop
+     */
+    void start() {
+        bool running = true;
+        auto last_time = std::chrono::steady_clock::now();
+
+        while (running) {
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_EVENT_QUIT) {
+                    running = false;
+                }
+            }
+
+            auto now = std::chrono::steady_clock::now();
+            auto delta = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                now - last_time);
+            last_time = now;
+
+            cycle(delta);
         }
     }
 };

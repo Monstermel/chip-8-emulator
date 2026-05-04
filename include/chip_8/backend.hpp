@@ -1,0 +1,235 @@
+#ifndef CHIP_8_BACKEND_HPP
+#define CHIP_8_BACKEND_HPP
+
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <stdexcept>
+
+#include "chip_8/chip_state.hpp"
+#include "chip_8/error.hpp"
+#include "chip_8/instruction_set.hpp"
+#include "chip_8/utility.hpp"
+
+namespace emu {
+
+class Backend {
+    ChipState state_;
+
+    /**
+     * @brief Fetch an instruction from memory and update program counter
+     *
+     * @return instruction in bytecode format
+     */
+    std::uint16_t fetch() noexcept {
+        const auto kInstruction =
+            (static_cast<unsigned int>(state_.memory[state_.program_counter])
+             << kByteWidth) |
+            static_cast<unsigned int>(
+                state_.memory[state_.program_counter + 1]);
+
+        state_.program_counter += 2;
+
+        return static_cast<std::uint16_t>(kInstruction);
+    }
+
+    /**
+     * @brief Map bytecode to its instruction under 0xxx group
+     *
+     * @param bytecode
+     * @return instruction_set::Instruction
+     */
+    static instruction_set::Instruction handleGroup0(
+        const std::uint16_t bytecode) {
+        switch (bytecode & 0x0FFFU) {
+            case 0x00E0:
+                return instruction_set::op00E0;
+            case 0x00EE:
+                return instruction_set::op00EE;
+            default:
+                return instruction_set::op0nnn;
+        }
+    }
+
+    /**
+     * @brief Map bytecode to its instruction under 8xxx group
+     *
+     * @param bytecode
+     * @return instruction_set::Instruction
+     */
+    static instruction_set::Instruction handleGroup8(
+        const std::uint16_t bytecode) {
+        switch (bytecode & 0x000FU) {
+            case 0x0000:
+                return instruction_set::op8xy0;
+            case 0x0001:
+                return instruction_set::op8xy1;
+            case 0x0002:
+                return instruction_set::op8xy2;
+            case 0x0003:
+                return instruction_set::op8xy3;
+            case 0x0004:
+                return instruction_set::op8xy4;
+            case 0x0005:
+                return instruction_set::op8xy5;
+            case 0x0006:
+                return instruction_set::op8xy6;
+            case 0x0007:
+                return instruction_set::op8xy7;
+            case 0x000E:
+                return instruction_set::op8xyE;
+            default:
+                throw InvalidInstructionError(bytecode);
+        }
+    }
+
+    /**
+     * @brief Map bytecode to its instruction under Exxx group
+     *
+     * @param bytecode
+     * @return instruction_set::Instruction
+     */
+    static instruction_set::Instruction handleGroupE(
+        const std::uint16_t bytecode) {
+        switch (bytecode & 0x00FFU) {
+            case 0x009E:
+                return instruction_set::opEx9E;
+            case 0x00A1:
+                return instruction_set::opExA1;
+            default:
+                throw InvalidInstructionError(bytecode);
+        }
+    }
+
+    /**
+     * @brief Map bytecode to its instruction under Fxxx group
+     *
+     * @param bytecode
+     * @return instruction_set::Instruction
+     */
+    static instruction_set::Instruction handleGroupF(
+        const std::uint16_t bytecode) {
+        switch (bytecode & 0x00FFU) {
+            case 0x0007:
+                return instruction_set::opFx07;
+            case 0x000A:
+                return instruction_set::opFx0A;
+            case 0x0015:
+                return instruction_set::opFx15;
+            case 0x0018:
+                return instruction_set::opFx18;
+            case 0x001E:
+                return instruction_set::opFx1E;
+            case 0x0029:
+                return instruction_set::opFx29;
+            case 0x0033:
+                return instruction_set::opFx33;
+            case 0x0055:
+                return instruction_set::opFx55;
+            case 0x0065:
+                return instruction_set::opFx65;
+            default:
+                throw InvalidInstructionError(bytecode);
+        }
+    }
+
+    /**
+     * @brief Map a bytecode to its corresponding instruction
+     *
+     * @param instruction
+     * @return instruction_set::Instruction
+     */
+    static instruction_set::Instruction decode(const std::uint16_t bytecode) {
+        switch (bytecode & 0xF000U) {
+            case 0x0000:
+                return handleGroup0(bytecode);
+            case 0x1000:
+                return instruction_set::op1nnn;
+            case 0x2000:
+                return instruction_set::op2nnn;
+            case 0x3000:
+                return instruction_set::op3xkk;
+            case 0x4000:
+                return instruction_set::op4xkk;
+            case 0x5000:
+                return instruction_set::op5xy0;
+            case 0x6000:
+                return instruction_set::op6xkk;
+            case 0x7000:
+                return instruction_set::op7xkk;
+            case 0x8000:
+                return handleGroup8(bytecode);
+            case 0x9000:
+                return instruction_set::op9xy0;
+            case 0xA000:
+                return instruction_set::opAnnn;
+            case 0xB000:
+                return instruction_set::opBnnn;
+            case 0xC000:
+                return instruction_set::opCxkk;
+            case 0xD000:
+                return instruction_set::opDxyn;
+            case 0xE000:
+                return handleGroupE(bytecode);
+            case 0xF000:
+                return handleGroupF(bytecode);
+            default:
+                throw InvalidInstructionError(bytecode);
+        }
+    }
+
+   public:
+    /**
+     * @brief Load ROM into memory
+     */
+    void load(const std::filesystem::path& path) {
+        // Open ROM
+        std::ifstream file(path, std::ifstream::ate | std::ifstream::binary);
+        if (!file.is_open()) {
+            throw std::runtime_error("Failed to open rom");
+        }
+
+        // Get size of file
+        std::streamsize size = file.tellg();
+        file.seekg(std::ifstream::beg);
+
+        // Load ROM into memory at kProgramSpaceOffset
+        if (!file.read(std::next(reinterpret_cast<char*>(state_.memory.data()),
+                                 memory::kProgramSpaceOffset),
+                       size)) {
+            throw std::runtime_error("Failed to read rom");
+        }
+    }
+
+    /**
+     * @brief Execute a single instruction
+     */
+    void step() {
+        const auto kBytecode = fetch();
+        const auto kInstruction = decode(kBytecode);
+        kInstruction(state_, kBytecode);
+    }
+
+    /**
+     * @brief Update timers
+     */
+    void updateDelayTimer() {
+        if (state_.delay_timer > 0) {
+            state_.delay_timer -= 1;
+        }
+    }
+
+    void setKeyboard(const bool* key_states) noexcept {
+        state_.keyboard = key_states;
+    }
+
+    display::Type& getDisplay() noexcept { return state_.display; }
+    std::atomic<std::uint8_t>& getSoundTimer() noexcept {
+        return state_.sound_timer;
+    }
+};
+
+}  // namespace emu
+
+#endif /* CHIP_8_BACKEND_HPP */

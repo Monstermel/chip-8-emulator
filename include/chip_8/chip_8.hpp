@@ -19,23 +19,25 @@ class Chip8 {
     Frontend frontend_;
     std::chrono::nanoseconds step_accumulator_{0};
     std::chrono::nanoseconds timer_accumulator_{0};
+    std::chrono::nanoseconds step_interval_;
+    bool paused_{false};
 
     /**
      * @brief Coordinate a single interpreter cycle
      *
      */
     void cycle(const std::chrono::nanoseconds& delta) {
-        // 1. CPU: ~700 Hz (1,428,571 ns per instruction)
+        // 1. CPU: Variable Speed
         step_accumulator_ += delta;
-        while (step_accumulator_ >= std::chrono::nanoseconds(1'428'571)) {
-            step_accumulator_ -= std::chrono::nanoseconds(1'428'571);
+        while (step_accumulator_ >= step_interval_) {
+            step_accumulator_ -= step_interval_;
 
             backend_.setKeyboard(SDL_GetKeyboardState(NULL));
 
             backend_.step();
         }
 
-        // 2. Timers & Graphics: 60 Hz (16,666,666 ns per tick)
+        // 2. Timers & Graphics: Fixed 60 Hz (16,666,666 ns per tick)
         timer_accumulator_ += delta;
         while (timer_accumulator_ >= std::chrono::nanoseconds(16'666'666)) {
             timer_accumulator_ -= std::chrono::nanoseconds(16'666'666);
@@ -54,6 +56,17 @@ class Chip8 {
 
    public:
     /**
+     * @brief Construct a new Chip8 object with optional configuration
+     * 
+     * @param speed_hz Instruction execution speed in Hz (default: 700)
+     * @param scale Window scale factor (default: 10.0)
+     * @param fullscreen Enable fullscreen mode (default: false)
+     */
+    Chip8(int speed_hz = 700, float scale = 10.0F, bool fullscreen = false)
+        : frontend_(scale, fullscreen),
+          step_interval_(std::chrono::nanoseconds(1'000'000'000 / speed_hz)) {}
+
+    /**
      * @brief Load ROM into the backend
      */
     void load(const std::filesystem::path& path) { backend_.load(path); }
@@ -70,6 +83,10 @@ class Chip8 {
             while (SDL_PollEvent(&event)) {
                 if (event.type == SDL_EVENT_QUIT) {
                     running = false;
+                } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+                    paused_ = true;
+                } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+                    paused_ = false;
                 }
             }
 
@@ -78,7 +95,9 @@ class Chip8 {
                 now - last_time);
             last_time = now;
 
-            cycle(delta);
+            if (!paused_) {
+                cycle(delta);
+            }
         }
     }
 };

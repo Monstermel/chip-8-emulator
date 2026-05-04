@@ -9,6 +9,7 @@
 #include "SDL3/SDL_audio.h"
 #include "chip_8/display.hpp"
 
+#include "SDL3/SDL_mouse.h"
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
 
@@ -37,10 +38,15 @@ class Frontend {
 
     bool audio_running_{false};
 
-    static auto makeWindow() {
-        SDL_Window* raw_window =
-            SDL_CreateWindow("Chip-8", display::kWidth * 10,
-                             display::kHeight * 10, SDL_WINDOW_RESIZABLE);
+    static auto makeWindow(float scale, bool fullscreen) {
+        SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE;
+        if (fullscreen) {
+            flags |= SDL_WINDOW_FULLSCREEN;
+        }
+
+        SDL_Window* raw_window = SDL_CreateWindow(
+            "Chip-8", static_cast<int>(display::kWidth * scale),
+            static_cast<int>(display::kHeight * scale), flags);
         if (raw_window == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -60,9 +66,6 @@ class Frontend {
     static auto makeAudioStream() {
         SDL_AudioSpec spec{.format = SDL_AUDIO_U8, .channels = 1, .freq = 8000};
 
-        // 8000Hz / 440Hz = 18.1818... samples per cycle.
-        // 800 samples is exactly 44 cycles, which perfectly loops without
-        // clicking.
         static constexpr auto kAudioBuffer = []() consteval {
             std::array<std::uint8_t, 800> arr{};
             float phase = 0.0F;
@@ -71,7 +74,6 @@ class Frontend {
                 if (phase > 1.0F) {
                     phase -= 1.0F;
                 }
-                // SDL_AUDIO_U8 silence is 128. Amplitude of 32 -> 160 and 96
                 arr[i] = (phase < 0.5F) ? 160 : 96;
             }
             return arr;
@@ -79,12 +81,10 @@ class Frontend {
 
         auto callback = [](void* /*userdata*/, SDL_AudioStream* stream,
                            int additional_amount, int /*total_amount*/) {
-            // Push complete 800-byte chunks (exactly 44 cycles).
-            // By always pushing complete cycles, we avoid needing any state!
             while (additional_amount > 0) {
                 SDL_PutAudioStreamData(stream, kAudioBuffer.data(),
-                                       kAudioBuffer.size());
-                additional_amount -= kAudioBuffer.size();
+                                       static_cast<int>(kAudioBuffer.size()));
+                additional_amount -= static_cast<int>(kAudioBuffer.size());
             }
         };
 
@@ -98,24 +98,35 @@ class Frontend {
     }
 
    public:
-    Frontend()
-        : window_(makeWindow()),
+    Frontend(float scale = 10.0F, bool fullscreen = false)
+        : window_(makeWindow(scale, fullscreen)),
           renderer_(makeRenderer(window_.get())),
           audio_stream_(makeAudioStream()) {
-        if (!SDL_SetRenderScale(renderer_.get(), 10.0F, 10.0F)) {
+        // Use logical presentation to handle scaling automatically
+        if (!SDL_SetRenderLogicalPresentation(
+                renderer_.get(), static_cast<int>(display::kWidth),
+                static_cast<int>(display::kHeight),
+                SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
             throw std::runtime_error(SDL_GetError());
+        }
+
+        // Set scaling quality to nearest pixel for sharp graphics
+        if (!SDL_SetRenderScale(renderer_.get(), 1.0F, 1.0F)) {
+             // Not strictly necessary if logical presentation is used, 
+             // but helps ensure 1:1 logical units
+        }
+
+        if (fullscreen) {
+            SDL_HideCursor();
         }
     }
 
     void renderDisplay(const display::Type& display) {
-        // Clear screen to black
         SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
         SDL_RenderClear(renderer_.get());
 
-        // Set drawing color to white (CHIP-8 foreground)
         SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
 
-        // Batch pixels
         int count = 0;
         std::array<SDL_FPoint, display::kWidth * display::kHeight> points{};
 
@@ -132,7 +143,6 @@ class Frontend {
             SDL_RenderPoints(renderer_.get(), points.data(), count);
         }
 
-        // Update screen
         SDL_RenderPresent(renderer_.get());
     }
 
@@ -151,8 +161,7 @@ class Frontend {
             }
         }
     };
-
-};  // namespace emu
+};
 
 }  // namespace emu
 

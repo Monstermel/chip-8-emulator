@@ -16,6 +16,12 @@ int main(int argc, char* argv[]) {
     option_adder("r,rom", "ROM file path",
                  cxxopts::value<std::filesystem::path>()->default_value(
                      "roms/snake.ch8"));
+    option_adder("s,speed", "Instruction speed in Hz",
+                 cxxopts::value<int>()->default_value("700"));
+    option_adder("z,scale", "Window scale factor",
+                 cxxopts::value<float>()->default_value("10.0"));
+    option_adder("f,fullscreen", "Enable fullscreen mode",
+                 cxxopts::value<bool>()->default_value("false"));
     option_adder("h,help", "Print usage");
 
     auto result = options.parse(argc, argv);
@@ -26,9 +32,12 @@ int main(int argc, char* argv[]) {
     }
 
     const auto kRomPath = result["rom"].as<std::filesystem::path>();
+    const auto kSpeedHz = result["speed"].as<int>();
+    const auto kScale = result["scale"].as<float>();
+    const auto kFullscreen = result["fullscreen"].as<bool>();
 
     try {
-        emu::Chip8 interpreter;
+        emu::Chip8 interpreter(kSpeedHz, kScale, kFullscreen);
 
         interpreter.load(kRomPath);
 

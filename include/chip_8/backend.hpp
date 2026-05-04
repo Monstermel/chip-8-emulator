@@ -211,9 +211,6 @@ class Backend {
         kInstruction(state_, kBytecode);
     }
 
-    /**
-     * @brief Update timers
-     */
     void updateDelayTimer() {
         if (state_.delay_timer > 0) {
             state_.delay_timer -= 1;
@@ -225,9 +222,8 @@ class Backend {
     }
 
     display::Type& getDisplay() noexcept { return state_.display; }
-    std::uint8_t& getSoundTimer() noexcept {
-        return state_.sound_timer;
-    }
+
+    std::uint8_t& getSoundTimer() noexcept { return state_.sound_timer; }
 };
 
 }  // namespace emu

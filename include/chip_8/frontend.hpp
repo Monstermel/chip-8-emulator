@@ -107,7 +107,6 @@ class Frontend {
         }
     }
 
-    // TODO: Add batch drawing
     void renderDisplay(const display::Type& display) {
         // Clear screen to black
         SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
@@ -116,14 +115,21 @@ class Frontend {
         // Set drawing color to white (CHIP-8 foreground)
         SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
 
-        // Draw pixels
+        // Batch pixels
+        int count = 0;
+        std::array<SDL_FPoint, display::kWidth * display::kHeight> points{};
+
         for (std::size_t y = 0; y < display::kHeight; y++) {
             for (std::size_t x = 0; x < display::kWidth; x++) {
                 if (display.buffer[x + (y * display::kWidth)] != 0U) {
-                    SDL_RenderPoint(renderer_.get(), static_cast<float>(x),
-                                    static_cast<float>(y));
+                    points[count++] = {.x = static_cast<float>(x),
+                                       .y = static_cast<float>(y)};
                 }
             }
+        }
+
+        if (count > 0) {
+            SDL_RenderPoints(renderer_.get(), points.data(), count);
         }
 
         // Update screen

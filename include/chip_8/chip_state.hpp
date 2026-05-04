@@ -1,10 +1,9 @@
 #ifndef CHIP_8_CHIP_STATE_HPP
 #define CHIP_8_CHIP_STATE_HPP
 
-#include <atomic>
+#include <array>
 #include <cstdint>
 #include <random>
-#include <stack>
 
 #include "chip_8/display.hpp"
 #include "chip_8/keyboard.hpp"
@@ -49,15 +48,17 @@ struct ChipState {
     // Index register
     std::uint16_t index_register{};
     // Delay Timer
-    std::atomic<std::uint8_t> delay_timer{0};
+    std::uint8_t delay_timer{0};
     // Sound Timer
-    std::atomic<std::uint8_t> sound_timer{0};
+    std::uint8_t sound_timer{0};
 
     // Keyboard state
     keyboard::Type keyboard{};
 
-    // Stack TODO: Implement a static stack
-    std::stack<std::uint16_t> stack;
+    // Stack
+    static constexpr std::size_t kStackSize = 16;
+    std::array<std::uint16_t, kStackSize> stack{};
+    std::uint8_t stack_pointer{0};
 };
 
 }  // namespace emu

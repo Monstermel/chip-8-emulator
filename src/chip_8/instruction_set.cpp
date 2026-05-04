@@ -19,12 +19,12 @@ void op00E0(ChipState& state, const std::uint16_t /* not used */) {
 }
 
 void op00EE(ChipState& state, const std::uint16_t /* not used */) {
-    if (state.stack.empty()) {
+    if (state.stack_pointer == 0) {
         throw StackUnderflowError("Stack underflow on RET");
     }
 
-    state.program_counter = state.stack.top();
-    state.stack.pop();
+    state.stack_pointer--;
+    state.program_counter = state.stack[state.stack_pointer];
 }
 
 void op1nnn(ChipState& state, const std::uint16_t bytecode) {
@@ -32,7 +32,12 @@ void op1nnn(ChipState& state, const std::uint16_t bytecode) {
 }
 
 void op2nnn(ChipState& state, const std::uint16_t bytecode) {
-    state.stack.push(state.program_counter);
+    if (state.stack_pointer >= ChipState::kStackSize) {
+        throw StackOverflowError("Stack overflow on CALL");
+    }
+
+    state.stack[state.stack_pointer] = state.program_counter;
+    state.stack_pointer++;
     state.program_counter = getAddress(bytecode);
 }
 

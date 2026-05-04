@@ -26,6 +26,13 @@ class StackUnderflowError : public std::runtime_error {
         : std::runtime_error(message) {}
 };
 
+class StackOverflowError : public std::runtime_error {
+   public:
+    explicit StackOverflowError() : std::runtime_error("Stack overflow") {};
+    explicit StackOverflowError(const std::string& message)
+        : std::runtime_error(message) {}
+};
+
 }  // namespace emu
 
 #endif /* CHIP_8_ERROR_HANDLING_HPP */

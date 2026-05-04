@@ -225,7 +225,7 @@ class Backend {
     }
 
     display::Type& getDisplay() noexcept { return state_.display; }
-    std::atomic<std::uint8_t>& getSoundTimer() noexcept {
+    std::uint8_t& getSoundTimer() noexcept {
         return state_.sound_timer;
     }
 };

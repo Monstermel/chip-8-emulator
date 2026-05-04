@@ -136,7 +136,7 @@ class Frontend {
         SDL_RenderPresent(renderer_.get());
     }
 
-    void handleSound(std::atomic<std::uint8_t>& sound_timer) {
+    void handleSound(std::uint8_t& sound_timer) {
         if (sound_timer > 0) {
             if (!audio_running_) {
                 SDL_ResumeAudioStreamDevice(audio_stream_.get());

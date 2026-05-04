@@ -49,13 +49,13 @@ TEST_F(Chip8OpcodeTest, Op00E0_ClearsDisplay) {
 }
 
 TEST_F(Chip8OpcodeTest, Op00EE_ReturnsFromSubroutine) {
-    state_->stack.push(0x300);
+    state_->stack[state_->stack_pointer++] = 0x300;
     state_->program_counter = 0x400;
 
     emu::instruction_set::op00EE(*state_, 0x00EE);
 
     EXPECT_EQ(state_->program_counter, 0x300);
-    EXPECT_TRUE(state_->stack.empty());
+    EXPECT_EQ(state_->stack_pointer, 0);
 }
 
 TEST_F(Chip8OpcodeTest, Op00EE_ThrowsOnEmptyStack) {
@@ -87,7 +87,7 @@ TEST_F(Chip8OpcodeTest, Op2nnn_CallsSubroutine) {
 
     emu::instruction_set::op2nnn(*state_, 0x2400);
 
-    EXPECT_EQ(state_->stack.top(), 0x200);
+    EXPECT_EQ(state_->stack[state_->stack_pointer - 1], 0x200);
     EXPECT_EQ(state_->program_counter, 0x400);
 }
 

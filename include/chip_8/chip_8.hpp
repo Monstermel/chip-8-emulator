@@ -20,12 +20,6 @@ class Chip8 {
     std::chrono::nanoseconds step_accumulator_{0};
     std::chrono::nanoseconds timer_accumulator_{0};
 
-   public:
-    /**
-     * @brief Load ROM into the backend
-     */
-    void load(const std::filesystem::path& path) { backend_.load(path); }
-
     /**
      * @brief Coordinate a single interpreter cycle
      *
@@ -57,6 +51,12 @@ class Chip8 {
             }
         }
     }
+
+   public:
+    /**
+     * @brief Load ROM into the backend
+     */
+    void load(const std::filesystem::path& path) { backend_.load(path); }
 
     /**
      * @brief Start the interpreter loop

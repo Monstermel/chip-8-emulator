@@ -132,11 +132,11 @@ class Chip8 {
                 now - last_time);
             last_time = now;
 
-            if (!paused_) {
-                cycle(delta);
+            if (paused_) {
+                frontend_.renderDisplay(backend_.getDisplay(), true);
+                frontend_.renderMenu(menu_index_);
             } else {
-                frontend_.renderDisplay(backend_.getDisplay(), true,
-                                        menu_index_);
+                cycle(delta);
             }
         }
     }

@@ -186,11 +186,11 @@ class Frontend {
 
         // Reset scale for next frame
         SDL_SetRenderScale(renderer_.get(), 1.0F, 1.0F);
+
+        SDL_RenderPresent(renderer_.get());
     }
 
-    void renderDisplay(const display::Type& display,
-                       bool paused = false,
-                       int selected_item = 0) {
+    void renderDisplay(const display::Type& display, bool dimmed = false) {
         int count = 0;
         std::array<SDL_FPoint, display::kWidth * display::kHeight> points{};
 
@@ -208,7 +208,7 @@ class Frontend {
         SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
         SDL_RenderClear(renderer_.get());
 
-        if (paused) {
+        if (dimmed) {
             SDL_SetRenderDrawColor(renderer_.get(), 80, 80, 80, 255);
         } else {
             SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
@@ -218,11 +218,9 @@ class Frontend {
             SDL_RenderPoints(renderer_.get(), points.data(), count);
         }
 
-        if (paused) {
-            renderMenu(selected_item);
+        if (!dimmed) {
+            SDL_RenderPresent(renderer_.get());
         }
-
-        SDL_RenderPresent(renderer_.get());
     }
 
     void handleSound(std::uint8_t& sound_timer) {

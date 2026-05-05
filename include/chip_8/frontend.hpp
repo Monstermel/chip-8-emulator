@@ -36,6 +36,18 @@ class Frontend {
                         })>;
     AudioStreamHandler audio_stream_;
 
+    using PaletteHandler =
+        std::unique_ptr<SDL_Palette, decltype([](SDL_Palette* palette) {
+                            SDL_DestroyPalette(palette);
+                        })>;
+    PaletteHandler palette_;
+
+    using TextureHandler =
+        std::unique_ptr<SDL_Texture, decltype([](SDL_Texture* texture) {
+                            SDL_DestroyTexture(texture);
+                        })>;
+    TextureHandler texture_;
+
     bool audio_running_{false};
 
     static auto makeWindow(float scale, bool fullscreen) {
@@ -101,7 +113,26 @@ class Frontend {
     Frontend(float scale = 10.0F, bool fullscreen = false)
         : window_(makeWindow(scale, fullscreen)),
           renderer_(makeRenderer(window_.get())),
-          audio_stream_(makeAudioStream()) {
+          audio_stream_(makeAudioStream()),
+          palette_(SDL_CreatePalette(2)),
+          texture_(SDL_CreateTexture(renderer_.get(),
+                                     SDL_PIXELFORMAT_INDEX8,
+                                     SDL_TEXTUREACCESS_STREAMING,
+                                     static_cast<int>(display::kWidth),
+                                     static_cast<int>(display::kHeight))) {
+        SDL_Color colors[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
+        if (!SDL_SetPaletteColors(palette_.get(), colors, 0, 2)) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
+        if (!SDL_SetTextureScaleMode(texture_.get(), SDL_SCALEMODE_NEAREST)) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
+        if (!SDL_SetTexturePalette(texture_.get(), palette_.get())) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
         // Use logical presentation to handle scaling automatically
         if (!SDL_SetRenderLogicalPresentation(
                 renderer_.get(), static_cast<int>(display::kWidth),
@@ -191,32 +222,19 @@ class Frontend {
     }
 
     void renderDisplay(const display::Type& display, bool dimmed = false) {
-        int count = 0;
-        std::array<SDL_FPoint, display::kWidth * display::kHeight> points{};
-
-        // TODO: I am pretty sure that instructions can do the drawing directly
-        // on points, so we get a zero-copy execution path
-        for (std::size_t y = 0; y < display::kHeight; y++) {
-            for (std::size_t x = 0; x < display::kWidth; x++) {
-                if (display.buffer[x + (y * display::kWidth)] != 0U) {
-                    points[count++] = {.x = static_cast<float>(x),
-                                       .y = static_cast<float>(y)};
-                }
-            }
-        }
-
         SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
         SDL_RenderClear(renderer_.get());
 
         if (dimmed) {
-            SDL_SetRenderDrawColor(renderer_.get(), 80, 80, 80, 255);
+            SDL_SetTextureColorMod(texture_.get(), 80, 80, 80);
         } else {
-            SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
+            SDL_SetTextureColorMod(texture_.get(), 255, 255, 255);
         }
 
-        if (count > 0) {
-            SDL_RenderPoints(renderer_.get(), points.data(), count);
-        }
+        SDL_UpdateTexture(texture_.get(), NULL, display.buffer.data(),
+                          static_cast<int>(display::kWidth));
+
+        SDL_RenderTexture(renderer_.get(), texture_.get(), NULL, NULL);
 
         if (!dimmed) {
             SDL_RenderPresent(renderer_.get());

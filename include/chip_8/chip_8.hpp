@@ -20,6 +20,8 @@ class Chip8 {
     std::chrono::nanoseconds step_accumulator_{0};
     std::chrono::nanoseconds timer_accumulator_{0};
     std::chrono::nanoseconds step_interval_;
+    int menu_index_{0};
+    bool running_{true};
     bool paused_{false};
 
     /**
@@ -57,7 +59,7 @@ class Chip8 {
    public:
     /**
      * @brief Construct a new Chip8 object with optional configuration
-     * 
+     *
      * @param speed_hz Instruction execution speed in Hz (default: 700)
      * @param scale Window scale factor (default: 10.0)
      * @param fullscreen Enable fullscreen mode (default: false)
@@ -71,23 +73,58 @@ class Chip8 {
      */
     void load(const std::filesystem::path& path) { backend_.load(path); }
 
+    void eventHandler(const SDL_Event& event) {
+        if (event.type == SDL_EVENT_QUIT) {
+            running_ = false;
+        } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
+            paused_ = true;
+            std::uint8_t zero = 0;
+            frontend_.handleSound(zero);
+        } else if (event.type == SDL_EVENT_KEY_DOWN) {
+            if (event.key.key == SDLK_ESCAPE) {
+                paused_ = !paused_;
+                if (paused_) {
+                    std::uint8_t zero = 0;
+                    frontend_.handleSound(zero);
+                }
+            }
+
+            if (paused_) {
+                if (event.key.key == SDLK_UP) {
+                    menu_index_ = (menu_index_ + 2) % 3;
+                } else if (event.key.key == SDLK_DOWN) {
+                    menu_index_ = (menu_index_ + 1) % 3;
+                } else if (event.key.key == SDLK_RETURN ||
+                           event.key.key == SDLK_SPACE) {
+                    switch (menu_index_) {
+                        case 0:
+                            paused_ = false;
+                            break;
+                        case 1:
+                            backend_.reset();
+                            paused_ = false;
+                            break;
+                        case 2:
+                            running_ = false;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * @brief Start the interpreter loop
      */
     void start() {
-        bool running = true;
         auto last_time = std::chrono::steady_clock::now();
 
-        while (running) {
+        while (running_) {
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_EVENT_QUIT) {
-                    running = false;
-                } else if (event.type == SDL_EVENT_WINDOW_FOCUS_LOST) {
-                    paused_ = true;
-                } else if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
-                    paused_ = false;
-                }
+                eventHandler(event);
             }
 
             auto now = std::chrono::steady_clock::now();
@@ -97,6 +134,9 @@ class Chip8 {
 
             if (!paused_) {
                 cycle(delta);
+            } else {
+                frontend_.renderDisplay(backend_.getDisplay(), true,
+                                        menu_index_);
             }
         }
     }

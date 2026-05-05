@@ -224,6 +224,21 @@ class Backend {
     display::Type& getDisplay() noexcept { return state_.display; }
 
     std::uint8_t& getSoundTimer() noexcept { return state_.sound_timer; }
+
+    /**
+     * @brief Reset the emulator state
+     */
+    void reset() {
+        state_.program_counter = memory::kProgramSpaceOffset;
+        state_.index_register = 0;
+        state_.stack_pointer = 0;
+        state_.delay_timer = 0;
+        state_.sound_timer = 0;
+        state_.V.fill(0);
+        state_.stack.fill(0);
+        state_.display.buffer.fill(0);
+        state_.display.draw = true;
+    }
 };
 
 }  // namespace emu

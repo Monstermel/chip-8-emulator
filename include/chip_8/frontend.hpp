@@ -112,8 +112,8 @@ class Frontend {
 
         // Set scaling quality to nearest pixel for sharp graphics
         if (!SDL_SetRenderScale(renderer_.get(), 1.0F, 1.0F)) {
-             // Not strictly necessary if logical presentation is used, 
-             // but helps ensure 1:1 logical units
+            // Not strictly necessary if logical presentation is used,
+            // but helps ensure 1:1 logical units
         }
 
         if (fullscreen) {
@@ -121,15 +121,81 @@ class Frontend {
         }
     }
 
-    void renderDisplay(const display::Type& display) {
-        SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
-        SDL_RenderClear(renderer_.get());
+    void renderMenu(int selected_item) {
+        // 1. Semi-transparent overlay (full screen)
+        SDL_SetRenderDrawBlendMode(renderer_.get(), SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 160);
+        constexpr SDL_FRect kFullOverlay = {
+            0, 0, static_cast<float>(display::kWidth),
+            static_cast<float>(display::kHeight)};
+        SDL_RenderFillRect(renderer_.get(), &kFullOverlay);
 
+        // 2. Compact Box in the center
+        constexpr float kBoxW = 48.0F;
+        constexpr float kBoxH = 26.0F;
+        constexpr float kBoxX =
+            (static_cast<float>(display::kWidth) - kBoxW) / 2.0F;
+        constexpr float kBoxY =
+            (static_cast<float>(display::kHeight) - kBoxH) / 2.0F;
+
+        // Shadow
+        SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 100);
+        constexpr SDL_FRect kShadow = {kBoxX + 1.0F, kBoxY + 1.0F, kBoxW,
+                                       kBoxH};
+        SDL_RenderFillRect(renderer_.get(), &kShadow);
+
+        // Main Box
+        SDL_SetRenderDrawColor(renderer_.get(), 25, 25, 35, 245);
+        constexpr SDL_FRect kBox = {kBoxX, kBoxY, kBoxW, kBoxH};
+        SDL_RenderFillRect(renderer_.get(), &kBox);
+
+        // Border
+        SDL_SetRenderDrawColor(renderer_.get(), 80, 80, 120, 255);
+        SDL_RenderRect(renderer_.get(), &kBox);
+
+        // 3. Draw Title (Bigger - Scale 0.75)
+        SDL_SetRenderScale(renderer_.get(), 0.75F, 0.75F);
         SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
 
+        // "PAUSED" is 6 chars * 8 * 0.75 = 36 wide.
+        // Centered in box: kBoxX + (48 - 36)/2 = kBoxX + 6.
+        // Scaled coordinate: (kBoxX + 6) / 0.75
+        SDL_RenderDebugText(renderer_.get(), (kBoxX + 6.0F) / 0.75F,
+                            (kBoxY + 2.0F) / 0.75F, "PAUSED");
+
+        // 4. Menu Items (Smaller - Scale 0.5)
+        SDL_SetRenderScale(renderer_.get(), 0.5F, 0.5F);
+        constexpr std::array<const char*, 3> kItems{"RESUME", "RESET", "QUIT"};
+        constexpr std::array<float, 3> kXOffsets{12.0F, 14.0F,
+                                                 16.0F};  // (48 - width)/2
+
+        for (int i = 0; i < 3; ++i) {
+            float item_x = (kBoxX + kXOffsets[i]) / 0.5F;
+            float item_y = (kBoxY + 11.0F + i * 5.0F) / 0.5F;
+
+            if (i == selected_item) {
+                SDL_SetRenderDrawColor(renderer_.get(), 0, 255, 180, 255);
+                SDL_RenderDebugText(renderer_.get(), item_x - 12.0F, item_y,
+                                    ">");
+                SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
+            } else {
+                SDL_SetRenderDrawColor(renderer_.get(), 170, 170, 170, 255);
+            }
+            SDL_RenderDebugText(renderer_.get(), item_x, item_y, kItems[i]);
+        }
+
+        // Reset scale for next frame
+        SDL_SetRenderScale(renderer_.get(), 1.0F, 1.0F);
+    }
+
+    void renderDisplay(const display::Type& display,
+                       bool paused = false,
+                       int selected_item = 0) {
         int count = 0;
         std::array<SDL_FPoint, display::kWidth * display::kHeight> points{};
 
+        // TODO: I am pretty sure that instructions can do the drawing directly
+        // on points, so we get a zero-copy execution path
         for (std::size_t y = 0; y < display::kHeight; y++) {
             for (std::size_t x = 0; x < display::kWidth; x++) {
                 if (display.buffer[x + (y * display::kWidth)] != 0U) {
@@ -139,8 +205,21 @@ class Frontend {
             }
         }
 
+        SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 255);
+        SDL_RenderClear(renderer_.get());
+
+        if (paused) {
+            SDL_SetRenderDrawColor(renderer_.get(), 80, 80, 80, 255);
+        } else {
+            SDL_SetRenderDrawColor(renderer_.get(), 255, 255, 255, 255);
+        }
+
         if (count > 0) {
             SDL_RenderPoints(renderer_.get(), points.data(), count);
+        }
+
+        if (paused) {
+            renderMenu(selected_item);
         }
 
         SDL_RenderPresent(renderer_.get());

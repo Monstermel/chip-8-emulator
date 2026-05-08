@@ -8,10 +8,23 @@
 #include "chip_8/error.hpp"
 #include "chip_8/keyboard.hpp"
 #include "chip_8/utility.hpp"
+#include "chip_8/font.hpp"
 
 namespace emu::instruction_set {
 
 void op0nnn(ChipState& /* not used */, const std::uint16_t /* not used */) {}
+
+void op00Cn(ChipState& state, const std::uint16_t bytecode) {
+    const auto kNibbleN = static_cast<std::size_t>(getNibbleN(bytecode));
+    const auto kRowSize = display::kHighWidth;
+    const auto kTotalRows = display::kHighHeight;
+
+    std::memmove(state.display.buffer.data() + (kNibbleN * kRowSize),
+                 state.display.buffer.data(),
+                 (kTotalRows - kNibbleN) * kRowSize);
+
+    std::memset(state.display.buffer.data(), 0x00, kNibbleN * kRowSize);
+}
 
 void op00E0(ChipState& state, const std::uint16_t /* not used */) {
     std::memset(state.display.buffer.data(), 0x00, state.display.buffer.size());
@@ -25,6 +38,46 @@ void op00EE(ChipState& state, const std::uint16_t /* not used */) {
 
     state.stack_pointer--;
     state.program_counter = state.stack[state.stack_pointer];
+}
+
+void op00FB(ChipState& state, const std::uint16_t /* not used */) {
+    constexpr std::size_t kShift = 4;
+    const auto kRowSize = display::kHighWidth;
+
+    // Shift right each row by 4 pixels
+    for (std::size_t row = 0; row < display::kHighHeight; row++) {
+        auto* row_ptr = state.display.buffer.data() + (row * kRowSize);
+
+        std::memmove(row_ptr + kShift, row_ptr, kRowSize - kShift);
+
+        std::memset(row_ptr, 0x00, kShift);
+    }
+}
+
+void op00FC(ChipState& state, const std::uint16_t /* not used */) {
+    constexpr std::size_t kShift = 4;
+    const auto kRowSize = display::kHighWidth;
+
+    // Shift left each row by 4 pixels
+    for (std::size_t row = 0; row < display::kHighHeight; row++) {
+        auto* row_ptr = state.display.buffer.data() + (row * kRowSize);
+
+        std::memmove(row_ptr, row_ptr + kShift, kRowSize - kShift);
+
+        std::memset(row_ptr + (kRowSize - kShift), 0x00, kShift);
+    }
+}
+
+void op00FD(ChipState& state, const std::uint16_t /* not used */) {
+    state.should_exit = true;
+}
+
+void op00FE(ChipState& state, const std::uint16_t /* not used */) {
+    state.display.mode = display::Mode::kLow;
+}
+
+void op00FF(ChipState& state, const std::uint16_t /* not used */) {
+    state.display.mode = display::Mode::kHigh;
 }
 
 void op1nnn(ChipState& state, const std::uint16_t bytecode) {
@@ -154,31 +207,36 @@ void opCxkk(ChipState& state, const std::uint16_t bytecode) {
 }
 
 void opDxyn(ChipState& state, const std::uint16_t bytecode) {
+    const std::size_t kWidth = (state.display.mode == display::Mode::kLow)
+                                   ? display::kLowWidth
+                                   : display::kHighWidth;
+    const std::size_t kHeight = (state.display.mode == display::Mode::kLow)
+                                    ? display::kLowHeight
+                                    : display::kHighHeight;
+
     const auto kCordX =
-        static_cast<std::size_t>(state.V[getNibbleX(bytecode)]) %
-        display::kWidth;
+        static_cast<std::size_t>(state.V[getNibbleX(bytecode)]) % kWidth;
     const auto kCordY =
-        static_cast<std::size_t>(state.V[getNibbleY(bytecode)]) %
-        display::kHeight;
+        static_cast<std::size_t>(state.V[getNibbleY(bytecode)]) % kHeight;
 
     const auto kNibbleN = static_cast<std::size_t>(getNibbleN(bytecode));
+    const auto kSpriteSize = (kNibbleN > 0) ? kNibbleN : 16;
 
     state.V[0xF] = 0U;
-    for (std::size_t j = 0; j < kNibbleN; j++) {
-        if ((kCordY + j) == display::kHeight) {
+    for (std::size_t j = 0; j < kSpriteSize; j++) {
+        if ((kCordY + j) == kHeight) {
             break;
         }
 
         const auto kSprite =
             static_cast<unsigned int>(state.memory[state.index_register + j]);
         for (std::size_t i = 0; i < kByteWidth; i++) {
-            if ((kCordX + i) == display::kWidth) {
+            if ((kCordX + i) == kWidth) {
                 break;
             }
 
             auto& old_pixel =
-                state.display
-                    .buffer[(kCordX + i) + ((kCordY + j) * display::kWidth)];
+                state.display.buffer[(kCordX + i) + ((kCordY + j) * kWidth)];
             const auto kNewPixel = (kSprite >> (kByteWidth - (i + 1U))) & 0x1U;
 
             state.V[0xF] |= static_cast<std::uint8_t>(kNewPixel & old_pixel);
@@ -258,7 +316,21 @@ void opFx29(ChipState& state, const std::uint16_t bytecode) {
     const auto kDigit =
         static_cast<std::uint16_t>(state.V[getNibbleX(bytecode)]);
 
-    state.index_register = font::kMemoryOffset + (kDigit * font::kSpriteSize);
+    state.index_register =
+        font::kLowMemoryOffset + (kDigit * font::kLowSpriteSize);
+}
+
+void opFx30(ChipState& state, const std::uint16_t bytecode) {
+    const auto kDigit =
+        static_cast<std::uint16_t>(state.V[getNibbleX(bytecode)]);
+
+    if (kDigit > 0x9U) {
+        throw std::runtime_error("Invalid digit for opFx30: " +
+                                 std::to_string(kDigit));
+    }
+
+    state.index_register =
+        font::kHighMemoryOffset + (kDigit * font::kHighSpriteSize);
 }
 
 void opFx33(ChipState& state, const std::uint16_t bytecode) {
@@ -290,6 +362,22 @@ void opFx65(ChipState& state, const std::uint16_t bytecode) {
     for (int idx = state.index_register, rgs = 0; rgs <= kNibbleX;
          idx++, rgs++) {
         state.V[rgs] = state.memory[idx];
+    }
+}
+
+void opFx75(ChipState& state, const std::uint16_t bytecode) {
+    const auto kNibbleX = getNibbleX(bytecode);
+
+    for (std::uint8_t idx = 0; idx <= kNibbleX && idx < 8U; ++idx) {
+        state.rpl[idx] = state.V[idx];
+    }
+}
+
+void opFx85(ChipState& state, const std::uint16_t bytecode) {
+    const auto kNibbleX = getNibbleX(bytecode);
+
+    for (std::uint8_t idx = 0; idx <= kNibbleX && idx < 8U; ++idx) {
+        state.V[idx] = state.rpl[idx];
     }
 }
 

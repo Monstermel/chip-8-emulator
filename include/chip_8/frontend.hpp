@@ -57,8 +57,8 @@ class Frontend {
         }
 
         SDL_Window* raw_window = SDL_CreateWindow(
-            "Chip-8", static_cast<int>(display::kWidth * scale),
-            static_cast<int>(display::kHeight * scale), flags);
+            "Chip-8", static_cast<int>(display::kHighWidth * scale),
+            static_cast<int>(display::kHighHeight * scale), flags);
         if (raw_window == nullptr) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -118,8 +118,8 @@ class Frontend {
           texture_(SDL_CreateTexture(renderer_.get(),
                                      SDL_PIXELFORMAT_INDEX8,
                                      SDL_TEXTUREACCESS_STREAMING,
-                                     static_cast<int>(display::kWidth),
-                                     static_cast<int>(display::kHeight))) {
+                                     static_cast<int>(display::kHighWidth),
+                                     static_cast<int>(display::kHighHeight))) {
         SDL_Color colors[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
         if (!SDL_SetPaletteColors(palette_.get(), colors, 0, 2)) {
             throw std::runtime_error(SDL_GetError());
@@ -135,8 +135,8 @@ class Frontend {
 
         // Use logical presentation to handle scaling automatically
         if (!SDL_SetRenderLogicalPresentation(
-                renderer_.get(), static_cast<int>(display::kWidth),
-                static_cast<int>(display::kHeight),
+                renderer_.get(), static_cast<int>(display::kHighWidth),
+                static_cast<int>(display::kHighHeight),
                 SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
             throw std::runtime_error(SDL_GetError());
         }
@@ -157,17 +157,17 @@ class Frontend {
         SDL_SetRenderDrawBlendMode(renderer_.get(), SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 160);
         constexpr SDL_FRect kFullOverlay = {
-            0, 0, static_cast<float>(display::kWidth),
-            static_cast<float>(display::kHeight)};
+            0, 0, static_cast<float>(display::kHighWidth),
+            static_cast<float>(display::kHighHeight)};
         SDL_RenderFillRect(renderer_.get(), &kFullOverlay);
 
         // 2. Compact Box in the center
         constexpr float kBoxW = 48.0F;
         constexpr float kBoxH = 26.0F;
         constexpr float kBoxX =
-            (static_cast<float>(display::kWidth) - kBoxW) / 2.0F;
+            (static_cast<float>(display::kHighWidth) - kBoxW) / 2.0F;
         constexpr float kBoxY =
-            (static_cast<float>(display::kHeight) - kBoxH) / 2.0F;
+            (static_cast<float>(display::kHighHeight) - kBoxH) / 2.0F;
 
         // Shadow
         SDL_SetRenderDrawColor(renderer_.get(), 0, 0, 0, 100);
@@ -232,7 +232,7 @@ class Frontend {
         }
 
         SDL_UpdateTexture(texture_.get(), NULL, display.buffer.data(),
-                          static_cast<int>(display::kWidth));
+                          static_cast<int>(display::kHighWidth));
 
         SDL_RenderTexture(renderer_.get(), texture_.get(), NULL, NULL);
 

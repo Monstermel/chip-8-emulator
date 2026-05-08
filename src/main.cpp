@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     const auto kFullscreen = result["fullscreen"].as<bool>();
 
     try {
-        emu::Chip8 interpreter(kSpeedHz, kScale, kFullscreen);
+        emu::Chip8 interpreter(kSpeedHz, kFullscreen, kScale);
 
         interpreter.load(kRomPath);
 

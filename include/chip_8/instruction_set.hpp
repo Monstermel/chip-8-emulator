@@ -7,14 +7,19 @@
 
 namespace emu::instruction_set {
 
-using Instruction = void (*)(ChipState& chip, const std::uint16_t);
-
 /**
  * @brief JMP to a host machine code - Treated as NOP
  *
  * @param bytecode
  */
 void op0nnn(ChipState& /* not used */, const std::uint16_t /* not used */);
+
+/**
+ * @brief SCD nibble - Scroll display down n rows.
+ *
+ * @param bytecode
+ */
+void op00Cn(ChipState& state, const std::uint16_t bytecode);
 
 /**
  * @brief CLS - Clear the display.
@@ -30,6 +35,41 @@ void op00E0(ChipState& state, const std::uint16_t bytecode);
  * @param bytecode
  */
 void op00EE(ChipState& state, const std::uint16_t /* not used */);
+
+/**
+ * @brief SCR - Scroll display right.
+ *
+ * @param bytecode
+ */
+void op00FB(ChipState& state, const std::uint16_t bytecode);
+
+/**
+ * @brief SCL - Scroll display left.
+ *
+ * @param bytecode
+ */
+void op00FC(ChipState& state, const std::uint16_t bytecode);
+
+/**
+ * @brief Exit - Exit interpreter.
+ *
+ * @param bytecode
+ */
+void op00FD(ChipState& state, const std::uint16_t /* not used */);
+
+/**
+ * @brief Low - Set low resolution.
+ *
+ * @param bytecode
+ */
+void op00FE(ChipState& state, const std::uint16_t /* not used */);
+
+/**
+ * @brief High - Set high resolution.
+ *
+ * @param bytecode
+ */
+void op00FF(ChipState& state, const std::uint16_t /* not used */);
 
 /**
  * @brief JMP to address - The interpreter sets the program counter to nnn.
@@ -241,6 +281,13 @@ void opFx1E(ChipState& state, const std::uint16_t bytecode);
 void opFx29(ChipState& state, const std::uint16_t bytecode);
 
 /**
+ * @brief LD HF, Vx - Set I = location of 16x16 sprite for digit Vx.
+ *
+ * @param bytecode
+ */
+void opFx30(ChipState& state, const std::uint16_t bytecode);
+
+/**
  * @brief LD B, Vx - Store BCD representation of Vx in memory locations I,
  * I+1, and I+2.
  *
@@ -258,12 +305,29 @@ void opFx33(ChipState& state, const std::uint16_t bytecode);
 void opFx55(ChipState& state, const std::uint16_t bytecode);
 
 /**
- * @brief Fx65 - LD Vx, [I] - Load memory starting at location I into registers V0 through Vx.
+ * @brief Fx65 - LD Vx, [I] - Load memory starting at location I into registers
+ * V0 through Vx.
  * @note CHIP-48 and SUPER-CHIP behavior. Don't update [I] after each load.
  * @todo Add option to recreate COSMAC VIP. Update [I] after each load.
  * @param bytecode
  */
 void opFx65(ChipState& state, const std::uint16_t bytecode);
+
+/**
+ * @brief LD R, Vx - Store registers V0 through Vx in RPL user flags
+ * (X=0..7).
+ *
+ * @param bytecode
+ */
+void opFx75(ChipState& state, const std::uint16_t bytecode);
+
+/**
+ * @brief LD Vx, R - Load RPL user flags (X=0..7) into registers V0 through
+ * Vx.
+ *
+ * @param bytecode
+ */
+void opFx85(ChipState& state, const std::uint16_t bytecode);
 
 };  // namespace emu::instruction_set
 

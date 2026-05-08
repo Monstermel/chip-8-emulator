@@ -6,14 +6,19 @@
 #include <cstdint>
 
 namespace emu::display {  // Registers metadata
-// X axis
-constexpr std::size_t kWidth = 64;
-// Y axis
-constexpr std::size_t kHeight = 32;
+
+constexpr std::size_t kLowWidth = 64;
+constexpr std::size_t kLowHeight = 32;
+
+constexpr std::size_t kHighWidth = 128;
+constexpr std::size_t kHighHeight = 64;
+
+enum class Mode : std::uint8_t { kLow = 0, kHigh = 1 };
 
 struct Display {
-    std::array<std::uint8_t, kWidth * kHeight> buffer{};
-    bool draw{};
+    std::array<std::uint8_t, kHighWidth * kHighHeight> buffer{};
+    bool draw{false};
+    Mode mode{Mode::kLow};
 };
 
 using Type = Display;

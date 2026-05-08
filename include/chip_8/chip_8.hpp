@@ -34,7 +34,7 @@ class Chip8 {
         while (step_accumulator_ >= step_interval_) {
             step_accumulator_ -= step_interval_;
 
-            backend_.setKeyboard(SDL_GetKeyboardState(NULL));
+            backend_.setKeyboard(SDL_GetKeyboardState(nullptr));
 
             backend_.step();
         }
@@ -64,7 +64,9 @@ class Chip8 {
      * @param scale Window scale factor (default: 10.0)
      * @param fullscreen Enable fullscreen mode (default: false)
      */
-    Chip8(int speed_hz = 700, float scale = 10.0F, bool fullscreen = false)
+    explicit Chip8(int speed_hz = 700,
+                   bool fullscreen = false,
+                   float scale = 10.0F)
         : frontend_(scale, fullscreen),
           step_interval_(std::chrono::nanoseconds(1'000'000'000 / speed_hz)) {}
 
@@ -137,6 +139,10 @@ class Chip8 {
                 frontend_.renderMenu(menu_index_);
             } else {
                 cycle(delta);
+            }
+
+            if (backend_.getExitFlag()) {
+                running_ = false;
             }
         }
     }

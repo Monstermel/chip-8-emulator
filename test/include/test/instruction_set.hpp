@@ -498,7 +498,7 @@ TEST_F(Chip8OpcodeTest, OpFx29_LoadsFontLocation) {
     emu::instruction_set::opFx29(*state_, 0xF529);
 
     EXPECT_EQ(state_->index_register,
-              emu::font::kMemoryOffset + (0xA * emu::font::kSpriteSize));
+              emu::font::kLowMemoryOffset + (0xA * emu::font::kLowSpriteSize));
 }
 
 // ============================================================================

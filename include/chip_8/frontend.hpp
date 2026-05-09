@@ -231,10 +231,25 @@ class Frontend {
             SDL_SetTextureColorMod(texture_.get(), 255, 255, 255);
         }
 
-        SDL_UpdateTexture(texture_.get(), NULL, display.buffer.data(),
-                          static_cast<int>(display::kHighWidth));
+        if (display.mode == display::Mode::kLow) {
+            const SDL_Rect kSrcRect = {0, 0,
+                                       static_cast<int>(display::kLowWidth),
+                                       static_cast<int>(display::kLowHeight)};
+            SDL_UpdateTexture(texture_.get(), &kSrcRect, display.buffer.data(),
+                              static_cast<int>(display::kLowWidth));
 
-        SDL_RenderTexture(renderer_.get(), texture_.get(), NULL, NULL);
+            const SDL_FRect kSrcFRect = {
+                0.0F, 0.0F, static_cast<float>(display::kLowWidth),
+                static_cast<float>(display::kLowHeight)};
+            SDL_RenderTexture(renderer_.get(), texture_.get(), &kSrcFRect,
+                              nullptr);
+        } else {
+            SDL_UpdateTexture(texture_.get(), nullptr, display.buffer.data(),
+                              static_cast<int>(display::kHighWidth));
+
+            SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr,
+                              nullptr);
+        }
 
         if (!dimmed) {
             SDL_RenderPresent(renderer_.get());

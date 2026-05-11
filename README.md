@@ -9,8 +9,5 @@ A small, portable Chip-8 emulator written in C++ using SDL. This repository cont
 - Small, self-contained codebase suitable for learning and extension
 - Configurable instruction speed and window resolution
 
-## TODO
-
-- Clear all clang-tidy warnings
-- Run against sanitizers
-- Review cmake code
+# Known Issues
+- The snake rom has a ghost bug, maybe one day I'll fix it.

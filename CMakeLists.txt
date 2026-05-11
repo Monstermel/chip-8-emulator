@@ -14,18 +14,16 @@ include(${CMAKE_CURRENT_LIST_DIR}/cmake/build-setup.cmake)
 
 # Headers
 
-add_library(_headers
-    src/chip_8/instruction_set.cpp
-)
+add_library(_headers INTERFACE)
 
 target_include_directories(_headers
-    PUBLIC 
+    INTERFACE 
         ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
 find_package(SDL3 CONFIG REQUIRED)
 target_link_libraries(_headers
-    PUBLIC 
+    INTERFACE 
         SDL3::SDL3
 )
 

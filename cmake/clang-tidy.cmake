@@ -1,0 +1,12 @@
+option(CHIP_8_ENABLE_CLANG_TIDY "Enable clang-tidy analysis during compilation" OFF)
+
+if(CHIP_8_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+    if(CLANG_TIDY_EXE)
+        message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+        set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}" CACHE STRING "" FORCE)
+    else()
+        message(WARNING "clang-tidy not found, disabling CHIP_8_ENABLE_CLANG_TIDY")
+        set(CHIP_8_ENABLE_CLANG_TIDY OFF CACHE BOOL "" FORCE)
+    endif()
+endif()

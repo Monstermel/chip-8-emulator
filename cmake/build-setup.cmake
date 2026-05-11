@@ -3,17 +3,24 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE BOOL "")
 set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "" FORCE)
 
+# Options
+option(CHIP_8_ENABLE_TESTS "Enable tests for current build" ON)
+
+# Include modules
+include(${CMAKE_CURRENT_LIST_DIR}/clang-tidy.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/sanitizers.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/options-log.cmake)
+
+# Compiler Flags
 if(MSVC)
-    # MSVC specific flags
-    set(COMPILER_FLAGS
+    add_compile_options(
         /W4          # Serious warnings
         /WX          # Warnings as errors
         /permissive- # Standards conformance
         /sdl         # Security Development Lifecycle checks
     )
 else()
-    # General Clang & GCC flags
-    set(COMPILER_FLAGS
+    add_compile_options(
         -Wall
         -Wextra
         -Wpedantic
@@ -31,26 +38,21 @@ else()
         -Wmissing-variable-declarations
     )
 
-    # Clang specific refinements
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        list(APPEND COMPILER_FLAGS 
+        add_compile_options(
             -Wshadow-all 
             -Wreserved-identifier
         )
-    # GCC specific refinements
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        list(APPEND COMPILER_FLAGS 
+        add_compile_options(
             -Wshadow 
             -Wlogical-op 
             -Wduplicated-cond 
             -Wduplicated-branches
-            -Wmissing-declarations # GCC equivalent for missing-variable-declarations
+            -Wmissing-declarations
         )
     endif()
 endif()
 
-# Convert list to string for CMAKE_CXX_FLAGS
-string(REPLACE ";" " " COMPILER_FLAGS_STR "${COMPILER_FLAGS}")
-
-# Apply globally to the cache
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMPILER_FLAGS_STR}" CACHE STRING "" FORCE)
+# Finalize log
+chip_8_log_options()

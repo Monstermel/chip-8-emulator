@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.1)
+cmake_minimum_required(VERSION 3.25)
 
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/vcpkg/scripts/buildsystems/vcpkg.cmake"
@@ -43,10 +43,6 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Tests setup
-
-option(CHIP_8_ENABLE_TESTS "Enable tests for current build" ON)
-message(STATUS "CHIP_8_ENABLE_TESTS: ${CHIP_8_ENABLE_TESTS}")
-
 if(CHIP_8_ENABLE_TESTS)
     enable_testing()
     

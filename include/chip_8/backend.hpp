@@ -30,8 +30,9 @@ class Backend {
 
         std::ofstream file(flags_path, std::ios::binary);
         if (file.is_open()) {
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
             file.write(reinterpret_cast<const char*>(state_.rpl.flags.data()),
-                       state_.rpl.flags.size());
+                       static_cast<std::streamsize>(state_.rpl.flags.size()));
             state_.rpl.dirty = false;
         }
     }
@@ -51,8 +52,9 @@ class Backend {
                 throw FailedToLoadRPLFlagsError();
             }
 
+            // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
             file.read(reinterpret_cast<char*>(state_.rpl.flags.data()),
-                      state_.rpl.flags.size());
+                      static_cast<std::streamsize>(state_.rpl.flags.size()));
             state_.rpl.dirty = false;
         }
     }
@@ -295,26 +297,24 @@ class Backend {
      */
     void load(const std::filesystem::path& path) {
         rom_path_ = path;
-        // Open ROM
+
+        // NOLINTNEXTLINE (hicpp-signed-bitwise)
         std::ifstream file(path, std::ifstream::ate | std::ifstream::binary);
         if (!file.is_open()) {
             throw FailedToLoadROMError();
         }
 
-        // Get size of file
         std::streamsize size = file.tellg();
         file.seekg(std::ifstream::beg);
 
-        // Store ROM data for resets
+        // NOLINTNEXTLINE (cppcoreguidelines-pro-type-reinterpret-cast)
         if (!file.read(reinterpret_cast<char*>(rom_buffer_.data()), size)) {
             throw FailedToReadROMError();
         }
 
-        // Apply ROM to memory
         std::ranges::copy(rom_buffer_,
                           state_.memory.begin() + memory::kProgramSpaceOffset);
 
-        // Load persistent flags
         loadRplFlags();
     }
 

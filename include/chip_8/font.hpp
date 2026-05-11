@@ -11,7 +11,6 @@ constexpr std::uint16_t kHighSpriteSize = 10;
 constexpr std::uint16_t kLowMemoryOffset = 0x000;
 constexpr std::uint16_t kHighMemoryOffset = 0x050;
 
-// NOLINTBEGIN (cppcoreguidelines-avoid-magic-numbers)
 consteval auto loadData() {
     return memory::Type{
         // clang-format off
@@ -87,7 +86,6 @@ consteval auto loadData() {
         // clang-format on
     };
 }
-// NOLINTEND (cppcoreguidelines-avoid-magic-numbers)
 
 }  // namespace emu::font
 

@@ -109,7 +109,7 @@ class Frontend {
     }
 
    public:
-    Frontend(float scale = 10.0F, bool fullscreen = false)
+    explicit Frontend(float scale = 10.0F, bool fullscreen = false)
         : window_(makeWindow(scale, fullscreen)),
           renderer_(makeRenderer(window_.get())),
           audio_stream_(makeAudioStream()),
@@ -119,8 +119,10 @@ class Frontend {
                                      SDL_TEXTUREACCESS_STREAMING,
                                      static_cast<int>(display::kHighWidth),
                                      static_cast<int>(display::kHighHeight))) {
-        SDL_Color colors[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
-        if (!SDL_SetPaletteColors(palette_.get(), colors, 0, 2)) {
+        std::array<SDL_Color, 2> colors = {
+            SDL_Color{.r = 0, .g = 0, .b = 0, .a = 255},
+            SDL_Color{.r = 255, .g = 255, .b = 255, .a = 255}};
+        if (!SDL_SetPaletteColors(palette_.get(), colors.data(), 0, 2)) {
             throw FailedToSetupSDLError(SDL_GetError());
         }
 
@@ -201,7 +203,8 @@ class Frontend {
 
         for (int i = 0; i < 3; ++i) {
             float item_x = (kBoxX + kXOffsets[i]) / 0.5F;
-            float item_y = (kBoxY + 11.0F + i * 5.0F) / 0.5F;
+            float item_y =
+                (kBoxY + 11.0F + static_cast<float>(i) * 5.0F) / 0.5F;
 
             if (i == selected_item) {
                 SDL_SetRenderDrawColor(renderer_.get(), 0, 255, 180, 255);

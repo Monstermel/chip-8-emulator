@@ -1,15 +1,14 @@
 #ifndef CHIP_8_BACKEND_HPP
 #define CHIP_8_BACKEND_HPP
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <stdexcept>
 
 #include "chip_8/chip_state.hpp"
 #include "chip_8/error.hpp"
 #include "chip_8/instruction_set.hpp"
-#include "chip_8/memory.hpp"
 #include "chip_8/utility.hpp"
 
 namespace emu {
@@ -19,6 +18,44 @@ class Backend {
     // ROM buffer for reset operations
     std::array<std::uint8_t, memory::kSize - memory::kProgramSpaceOffset>
         rom_buffer_{};
+    std::filesystem::path rom_path_;
+
+    void saveRplFlags() {
+        if (rom_path_.empty() || !state_.rpl.dirty) {
+            return;
+        }
+
+        auto flags_path = rom_path_;
+        flags_path.replace_extension(".flags");
+
+        std::ofstream file(flags_path, std::ios::binary);
+        if (file.is_open()) {
+            file.write(reinterpret_cast<const char*>(state_.rpl.flags.data()),
+                       state_.rpl.flags.size());
+            state_.rpl.dirty = false;
+        }
+    }
+
+    void loadRplFlags() {
+        if (rom_path_.empty()) {
+            return;
+        }
+
+        auto flags_path = rom_path_;
+        flags_path.replace_extension(".flags");
+
+        if (std::filesystem::exists(flags_path)) {
+            std::ifstream file(flags_path, std::ios::binary);
+
+            if (!file.is_open()) {
+                throw FailedToLoadRPLFlagsError();
+            }
+
+            file.read(reinterpret_cast<char*>(state_.rpl.flags.data()),
+                      state_.rpl.flags.size());
+            state_.rpl.dirty = false;
+        }
+    }
 
     /**
      * @brief Fetch an instruction from memory and update program counter
@@ -248,10 +285,16 @@ class Backend {
    public:
     explicit Backend(const Mode mode = Mode::kSuperChip) { state_.mode = mode; }
 
+    Backend(const Backend&) = delete;
+    Backend& operator=(const Backend&) = delete;
+    Backend(const Backend&&) = delete;
+    Backend&& operator=(const Backend&&) = delete;
+
     /**
      * @brief Load ROM into memory
      */
     void load(const std::filesystem::path& path) {
+        rom_path_ = path;
         // Open ROM
         std::ifstream file(path, std::ifstream::ate | std::ifstream::binary);
         if (!file.is_open()) {
@@ -270,6 +313,9 @@ class Backend {
         // Apply ROM to memory
         std::ranges::copy(rom_buffer_,
                           state_.memory.begin() + memory::kProgramSpaceOffset);
+
+        // Load persistent flags
+        loadRplFlags();
     }
 
     void step() {
@@ -277,14 +323,16 @@ class Backend {
         execute(kBytecode);
     }
 
-    void updateDelayTimer() noexcept {
-        if (state_.delay_timer > 0) {
-            state_.delay_timer -= 1;
-        }
-    }
+    ~Backend() { saveRplFlags(); }
 
     void setKeyboard(const bool* key_states) noexcept {
         state_.keyboard = key_states;
+    }
+
+    void updateDelayTimer() {
+        if (state_.delay_timer > 0) {
+            state_.delay_timer -= 1;
+        }
     }
 
     display::Type& getDisplay() noexcept { return state_.display; }
@@ -299,14 +347,16 @@ class Backend {
      * @brief Reset the emulator state
      */
     void reset() noexcept {
-        // Preserve mode and exit flag across resets
+        // Preserve mode, exit flag, and RPL flags across resets
         const auto kCurrentMode = state_.mode;
         const auto kShouldExit = state_.should_exit;
+        const auto kRplFlags = state_.rpl;
 
         state_ = ChipState();
 
         state_.mode = kCurrentMode;
         state_.should_exit = kShouldExit;
+        state_.rpl = kRplFlags;
         state_.display.draw = true;
 
         // Re-apply ROM

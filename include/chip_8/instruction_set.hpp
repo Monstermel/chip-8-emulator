@@ -19,7 +19,8 @@ namespace emu::instruction_set {
  *
  * @param bytecode
  */
-inline void op0nnn(ChipState& /* not used */, const std::uint16_t /* not used */) {}
+inline void op0nnn(ChipState& /* not used */,
+                   const std::uint16_t /* not used */) {}
 
 /**
  * @brief SCD nibble - Scroll display down n rows.
@@ -615,8 +616,9 @@ inline void opFx75(ChipState& state, const std::uint16_t bytecode) {
     const auto kNibbleX = getNibbleX(bytecode);
 
     for (std::uint8_t idx = 0; idx <= kNibbleX && idx < 8U; ++idx) {
-        state.rpl[idx] = state.V[idx];
+        state.rpl.flags[idx] = state.V[idx];
     }
+    state.rpl.dirty = true;
 }
 
 /**
@@ -629,7 +631,7 @@ inline void opFx85(ChipState& state, const std::uint16_t bytecode) {
     const auto kNibbleX = getNibbleX(bytecode);
 
     for (std::uint8_t idx = 0; idx <= kNibbleX && idx < 8U; ++idx) {
-        state.V[idx] = state.rpl[idx];
+        state.V[idx] = state.rpl.flags[idx];
     }
 }
 

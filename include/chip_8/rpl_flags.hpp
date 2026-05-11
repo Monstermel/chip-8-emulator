@@ -9,7 +9,12 @@ namespace emu::rpl_flags {
 
 constexpr std::size_t kNum = 16;
 
-using Type = std::array<std::uint8_t, kNum>;
+struct RPLFlags {
+    std::array<std::uint8_t, kNum> flags{};
+    bool dirty{false};
+};
+
+using Type = RPLFlags;
 
 }  // namespace emu::rpl_flags
 

@@ -41,6 +41,14 @@ class FailedToSetupSDLError : public std::runtime_error {
         : std::runtime_error("Failed to setup SDL: " + message) {}
 };
 
+class FailedToLoadRPLFlagsError : public std::runtime_error {
+   public:
+    explicit FailedToLoadRPLFlagsError()
+        : std::runtime_error("Failed to load RPL flags") {};
+    explicit FailedToLoadRPLFlagsError(const std::string& message)
+        : std::runtime_error("Failed to load RPL flags: " + message) {}
+};
+
 class FailedToLoadROMError : public std::runtime_error {
    public:
     explicit FailedToLoadROMError()

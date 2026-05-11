@@ -255,7 +255,7 @@ void opDxyn(ChipState& state, const std::uint16_t bytecode) {
 
 void opEx9E(ChipState& state, const std::uint16_t bytecode) {
     if (state.keyboard == nullptr) {
-        return;
+        throw NullKeyboardError("opEx9E");
     }
 
     const auto kKey = state.V[getNibbleX(bytecode)];
@@ -267,7 +267,7 @@ void opEx9E(ChipState& state, const std::uint16_t bytecode) {
 
 void opExA1(ChipState& state, const std::uint16_t bytecode) {
     if (state.keyboard == nullptr) {
-        return;
+        throw NullKeyboardError("opExA1");
     }
 
     const auto kKey = state.V[getNibbleX(bytecode)];
@@ -283,9 +283,7 @@ void opFx07(ChipState& state, const std::uint16_t bytecode) {
 
 void opFx0A(ChipState& state, const std::uint16_t bytecode) {
     if (state.keyboard == nullptr) {
-        // REVIEW: Should we throw an error here? If this is called with a null
-        // keyboard for sure an error happened
-        return;
+        throw NullKeyboardError("opFx0A");
     }
 
     int key_pressed = -1;
@@ -301,8 +299,7 @@ void opFx0A(ChipState& state, const std::uint16_t bytecode) {
         // Run this instruction again in the next cycle
         state.program_counter -= 2U;
     } else {
-        const auto kNibbleX = getNibbleX(bytecode);
-        state.V[kNibbleX] = static_cast<std::uint8_t>(key_pressed);
+        state.V[getNibbleX(bytecode)] = static_cast<std::uint8_t>(key_pressed);
     }
 }
 
@@ -331,8 +328,7 @@ void opFx30(ChipState& state, const std::uint16_t bytecode) {
         static_cast<std::uint16_t>(state.V[getNibbleX(bytecode)]);
 
     if (kDigit > 0x9U) {
-        throw std::runtime_error("Invalid digit for opFx30: " +
-                                 std::to_string(kDigit));
+        throw InvalidSpriteLoadError("opFx30");
     }
 
     state.index_register =

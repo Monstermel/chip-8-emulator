@@ -24,7 +24,7 @@ inline Mode stringToMode(const std::string& mode_str) {
         return Mode::kSuperChip;
     }
 
-    throw std::invalid_argument("Invalid mode: " + mode_str);
+    throw InvalidModeError("Invalid mode: " + mode_str);
 }
 
 struct ChipState {

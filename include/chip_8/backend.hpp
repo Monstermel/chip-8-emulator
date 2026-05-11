@@ -255,7 +255,7 @@ class Backend {
         // Open ROM
         std::ifstream file(path, std::ifstream::ate | std::ifstream::binary);
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open rom");
+            throw FailedToLoadROMError();
         }
 
         // Get size of file
@@ -264,7 +264,7 @@ class Backend {
 
         // Store ROM data for resets
         if (!file.read(reinterpret_cast<char*>(rom_buffer_.data()), size)) {
-            throw std::runtime_error("Failed to read rom");
+            throw FailedToReadROMError();
         }
 
         // Apply ROM to memory
@@ -277,7 +277,7 @@ class Backend {
         execute(kBytecode);
     }
 
-    void updateDelayTimer() {
+    void updateDelayTimer() noexcept {
         if (state_.delay_timer > 0) {
             state_.delay_timer -= 1;
         }
@@ -298,7 +298,7 @@ class Backend {
     /**
      * @brief Reset the emulator state
      */
-    void reset() {
+    void reset() noexcept {
         // Preserve mode and exit flag across resets
         const auto kCurrentMode = state_.mode;
         const auto kShouldExit = state_.should_exit;

@@ -1,7 +1,7 @@
 #ifndef CHIP_8_ENV_HPP
 #define CHIP_8_ENV_HPP
 
-#include <stdexcept>
+#include "chip_8/error.hpp"
 
 #include "SDL3/SDL_init.h"
 
@@ -11,8 +11,7 @@ class Env {
    public:
     Env() {
         if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-            throw std::runtime_error("Failed to init sdl: " +
-                                     std::string(SDL_GetError()));
+            throw FailedToSetupSDLError(SDL_GetError());
         }
     }
 

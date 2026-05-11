@@ -2,13 +2,12 @@
 #define CHIP_8_FRONTEND_HPP
 
 #include <array>
-#include <atomic>
 #include <memory>
-#include <stdexcept>
+
+#include "chip_8/display.hpp"
+#include "chip_8/error.hpp"
 
 #include "SDL3/SDL_audio.h"
-#include "chip_8/display.hpp"
-
 #include "SDL3/SDL_mouse.h"
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
@@ -60,7 +59,7 @@ class Frontend {
             "Chip-8", static_cast<int>(display::kHighWidth * scale),
             static_cast<int>(display::kHighHeight * scale), flags);
         if (raw_window == nullptr) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         return WindowHandler{raw_window};
@@ -69,7 +68,7 @@ class Frontend {
     static auto makeRenderer(SDL_Window* window) {
         SDL_Renderer* raw_renderer = SDL_CreateRenderer(window, nullptr);
         if (raw_renderer == nullptr) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         return RendererHandler{raw_renderer};
@@ -103,7 +102,7 @@ class Frontend {
         SDL_AudioStream* raw_audio_stream = SDL_OpenAudioDeviceStream(
             SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, callback, nullptr);
         if (raw_audio_stream == nullptr) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         return AudioStreamHandler{raw_audio_stream};
@@ -122,15 +121,15 @@ class Frontend {
                                      static_cast<int>(display::kHighHeight))) {
         SDL_Color colors[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
         if (!SDL_SetPaletteColors(palette_.get(), colors, 0, 2)) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         if (!SDL_SetTextureScaleMode(texture_.get(), SDL_SCALEMODE_NEAREST)) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         if (!SDL_SetTexturePalette(texture_.get(), palette_.get())) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         // Use logical presentation to handle scaling automatically
@@ -138,7 +137,7 @@ class Frontend {
                 renderer_.get(), static_cast<int>(display::kHighWidth),
                 static_cast<int>(display::kHighHeight),
                 SDL_LOGICAL_PRESENTATION_LETTERBOX)) {
-            throw std::runtime_error(SDL_GetError());
+            throw FailedToSetupSDLError(SDL_GetError());
         }
 
         // Set scaling quality to nearest pixel for sharp graphics

@@ -164,8 +164,7 @@ void op8xy5(ChipState& state, const std::uint16_t bytecode);
 
 /**
  * @brief SHR Vx {, Vy} - Set Vx = Vx SHR 1.
- * @note CHIP-48 and SUPER-CHIP behavior. Ignore Vy and shift Vx in place.
- * @todo Add option to recreate COSMAC VIP. Store Vy into Vx first.
+ *
  * @param bytecode
  */
 void op8xy6(ChipState& state, const std::uint16_t bytecode);
@@ -179,8 +178,7 @@ void op8xy7(ChipState& state, const std::uint16_t bytecode);
 
 /**
  * @brief SHL Vx {, Vy} - Set Vx = Vx SHL 1.
- * @note CHIP-48 and SUPER-CHIP behavior. Ignore Vy and shift Vx in place.
- * @todo Add option to recreate COSMAC VIP. Store Vy into Vx first.
+ *
  * @param bytecode
  */
 void op8xyE(ChipState& state, const std::uint16_t bytecode);
@@ -298,8 +296,7 @@ void opFx33(ChipState& state, const std::uint16_t bytecode);
 /**
  * @brief LD [I], Vx - Store registers V0 through Vx in memory starting at
  * location I.
- * @note CHIP-48 and SUPER-CHIP behavior. Don't update I after each store.
- * @todo Add option to recreate COSMAC VIP. Update I after each store.
+ *
  * @param bytecode
  */
 void opFx55(ChipState& state, const std::uint16_t bytecode);
@@ -307,8 +304,7 @@ void opFx55(ChipState& state, const std::uint16_t bytecode);
 /**
  * @brief Fx65 - LD Vx, [I] - Load memory starting at location I into registers
  * V0 through Vx.
- * @note CHIP-48 and SUPER-CHIP behavior. Don't update [I] after each load.
- * @todo Add option to recreate COSMAC VIP. Update [I] after each load.
+ *
  * @param bytecode
  */
 void opFx65(ChipState& state, const std::uint16_t bytecode);

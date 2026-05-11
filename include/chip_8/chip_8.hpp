@@ -60,15 +60,18 @@ class Chip8 {
     /**
      * @brief Construct a new Chip8 object with optional configuration
      *
+     * @param mode Emulation mode (default: Super Chip)
      * @param speed_hz Instruction execution speed in Hz (default: 700)
      * @param scale Window scale factor (default: 10.0)
      * @param fullscreen Enable fullscreen mode (default: false)
      */
-    explicit Chip8(int speed_hz = 700,
+    explicit Chip8(Mode mode = Mode::kSuperChip,
+                   int speed_hz = 700,
                    bool fullscreen = false,
                    float scale = 10.0F)
-        : frontend_(scale, fullscreen),
-          step_interval_(std::chrono::nanoseconds(1'000'000'000 / speed_hz)) {}
+        : backend_{mode},
+          frontend_{scale, fullscreen},
+          step_interval_{std::chrono::nanoseconds{1'000'000'000 / speed_hz}} {}
 
     /**
      * @brief Load ROM into the backend

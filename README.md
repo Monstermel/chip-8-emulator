@@ -10,5 +10,3 @@ A small, portable Chip-8 emulator written in C++ using SDL. This repository cont
 - Configurable instruction speed and window resolution
 
 ## TODO
-
-- Add option to simulate target chip model (COSMAC VIP, CHIP-48, SUPER-CHIP)

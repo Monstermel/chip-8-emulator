@@ -4,18 +4,21 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iterator>
 #include <stdexcept>
 
 #include "chip_8/chip_state.hpp"
 #include "chip_8/error.hpp"
 #include "chip_8/instruction_set.hpp"
+#include "chip_8/memory.hpp"
 #include "chip_8/utility.hpp"
 
 namespace emu {
 
 class Backend {
     ChipState state_;
+    // ROM buffer for reset operations
+    std::array<std::uint8_t, memory::kSize - memory::kProgramSpaceOffset>
+        rom_buffer_{};
 
     /**
      * @brief Fetch an instruction from memory and update program counter
@@ -243,6 +246,8 @@ class Backend {
     }
 
    public:
+    explicit Backend(const Mode mode = Mode::kSuperChip) { state_.mode = mode; }
+
     /**
      * @brief Load ROM into memory
      */
@@ -257,12 +262,14 @@ class Backend {
         std::streamsize size = file.tellg();
         file.seekg(std::ifstream::beg);
 
-        // Load ROM into memory at kProgramSpaceOffset
-        if (!file.read(std::next(reinterpret_cast<char*>(state_.memory.data()),
-                                 memory::kProgramSpaceOffset),
-                       size)) {
+        // Store ROM data for resets
+        if (!file.read(reinterpret_cast<char*>(rom_buffer_.data()), size)) {
             throw std::runtime_error("Failed to read rom");
         }
+
+        // Apply ROM to memory
+        std::ranges::copy(rom_buffer_,
+                          state_.memory.begin() + memory::kProgramSpaceOffset);
     }
 
     void step() {
@@ -292,15 +299,19 @@ class Backend {
      * @brief Reset the emulator state
      */
     void reset() {
-        state_.program_counter = memory::kProgramSpaceOffset;
-        state_.index_register = 0;
-        state_.stack_pointer = 0;
-        state_.delay_timer = 0;
-        state_.sound_timer = 0;
-        state_.V.fill(0);
-        state_.stack.fill(0);
-        state_.display.buffer.fill(0);
+        // Preserve mode and exit flag across resets
+        const auto kCurrentMode = state_.mode;
+        const auto kShouldExit = state_.should_exit;
+
+        state_ = ChipState();
+
+        state_.mode = kCurrentMode;
+        state_.should_exit = kShouldExit;
         state_.display.draw = true;
+
+        // Re-apply ROM
+        std::ranges::copy(rom_buffer_,
+                          state_.memory.begin() + memory::kProgramSpaceOffset);
     }
 };
 

@@ -49,13 +49,13 @@ TEST_F(Chip8OpcodeTest, Op00E0_ClearsDisplay) {
 }
 
 TEST_F(Chip8OpcodeTest, Op00EE_ReturnsFromSubroutine) {
-    state_->stack[state_->stack_pointer++] = 0x300;
+    state_->stack.push(0x300);
     state_->program_counter = 0x400;
 
     emu::instruction_set::op00EE(*state_, 0x00EE);
 
     EXPECT_EQ(state_->program_counter, 0x300);
-    EXPECT_EQ(state_->stack_pointer, 0);
+    EXPECT_THROW(state_->stack.pop(), emu::StackUnderflowError);
 }
 
 TEST_F(Chip8OpcodeTest, Op00EE_ThrowsOnEmptyStack) {
@@ -72,8 +72,16 @@ TEST_F(Chip8OpcodeTest, Op1nnn_JumpsToAddress) {
     EXPECT_EQ(state_->program_counter, 0x234);
 }
 
-TEST_F(Chip8OpcodeTest, OpBnnn_JumpsToAddressPlusV0) {
+TEST_F(Chip8OpcodeTest, OpBnnn_JumpsToAddressPlusV0_CosmacVIP) {
+    state_->mode = emu::Mode::kCosmacVIP;
     state_->V[0] = 0x10;
+    emu::instruction_set::opBnnn(*state_, 0xB300);
+    EXPECT_EQ(state_->program_counter, 0x310);
+}
+
+TEST_F(Chip8OpcodeTest, OpBnnn_JumpsToAddressPlusVx_SuperChip) {
+    state_->mode = emu::Mode::kSuperChip;
+    state_->V[3] = 0x10;
     emu::instruction_set::opBnnn(*state_, 0xB300);
     EXPECT_EQ(state_->program_counter, 0x310);
 }
@@ -87,7 +95,7 @@ TEST_F(Chip8OpcodeTest, Op2nnn_CallsSubroutine) {
 
     emu::instruction_set::op2nnn(*state_, 0x2400);
 
-    EXPECT_EQ(state_->stack[state_->stack_pointer - 1], 0x200);
+    EXPECT_EQ(state_->stack.pop(), 0x200);
     EXPECT_EQ(state_->program_counter, 0x400);
 }
 
@@ -294,7 +302,8 @@ TEST_F(Chip8OpcodeTest, Op8xy3_XORsVxWithVy) {
 // Shift Instructions (8xy6, 8xyE)
 // ============================================================================
 
-TEST_F(Chip8OpcodeTest, Op8xy6_ShiftsVxRight) {
+TEST_F(Chip8OpcodeTest, Op8xy6_ShiftsVxRight_SuperChip) {
+    state_->mode = emu::Mode::kSuperChip;
     state_->V[3] = 0b10101010;
 
     emu::instruction_set::op8xy6(*state_, 0x8376);
@@ -303,7 +312,19 @@ TEST_F(Chip8OpcodeTest, Op8xy6_ShiftsVxRight) {
     EXPECT_EQ(state_->V[0xF], 0x00);
 }
 
+TEST_F(Chip8OpcodeTest, Op8xy6_ShiftsVxRight_CosmacVIP) {
+    state_->mode = emu::Mode::kCosmacVIP;
+    state_->V[3] = 0b00000000;
+    state_->V[7] = 0b10101010;
+
+    emu::instruction_set::op8xy6(*state_, 0x8376);
+
+    EXPECT_EQ(state_->V[3], 0b01010101);
+    EXPECT_EQ(state_->V[0xF], 0x00);
+}
+
 TEST_F(Chip8OpcodeTest, Op8xy6_StoresLSBInVF) {
+    state_->mode = emu::Mode::kSuperChip;
     state_->V[3] = 0b10101011;
 
     emu::instruction_set::op8xy6(*state_, 0x8376);
@@ -312,7 +333,8 @@ TEST_F(Chip8OpcodeTest, Op8xy6_StoresLSBInVF) {
     EXPECT_EQ(state_->V[0xF], 0x01);
 }
 
-TEST_F(Chip8OpcodeTest, Op8xyE_ShiftsVxLeft) {
+TEST_F(Chip8OpcodeTest, Op8xyE_ShiftsVxLeft_SuperChip) {
+    state_->mode = emu::Mode::kSuperChip;
     state_->V[3] = 0b01010101;
 
     emu::instruction_set::op8xyE(*state_, 0x837E);
@@ -321,7 +343,19 @@ TEST_F(Chip8OpcodeTest, Op8xyE_ShiftsVxLeft) {
     EXPECT_EQ(state_->V[0xF], 0x00);
 }
 
+TEST_F(Chip8OpcodeTest, Op8xyE_ShiftsVxLeft_CosmacVIP) {
+    state_->mode = emu::Mode::kCosmacVIP;
+    state_->V[3] = 0b00000000;
+    state_->V[7] = 0b01010101;
+
+    emu::instruction_set::op8xyE(*state_, 0x837E);
+
+    EXPECT_EQ(state_->V[3], 0b10101010);
+    EXPECT_EQ(state_->V[0xF], 0x00);
+}
+
 TEST_F(Chip8OpcodeTest, Op8xyE_StoresMSBInVF) {
+    state_->mode = emu::Mode::kSuperChip;
     state_->V[3] = 0b10101010;
 
     emu::instruction_set::op8xyE(*state_, 0x837E);
@@ -531,7 +565,8 @@ TEST_F(Chip8OpcodeTest, OpFx33_HandlesSingleDigit) {
 // Memory Instructions (Fx55, Fx65)
 // ============================================================================
 
-TEST_F(Chip8OpcodeTest, OpFx55_StoresRegistersInMemory) {
+TEST_F(Chip8OpcodeTest, OpFx55_StoresRegistersInMemory_SuperChip) {
+    state_->mode = emu::Mode::kSuperChip;
     state_->index_register = 0x300;
     for (int i = 0; i <= 5; i++) {
         state_->V[i] = static_cast<std::uint8_t>(i * 10);
@@ -540,15 +575,31 @@ TEST_F(Chip8OpcodeTest, OpFx55_StoresRegistersInMemory) {
     emu::instruction_set::opFx55(*state_, 0xF555);
 
     for (int i = 0; i <= 5; i++) {
-        EXPECT_EQ(state_->memory[state_->index_register + i], i * 10);
+        EXPECT_EQ(state_->memory[0x300 + i], i * 10);
     }
+    EXPECT_EQ(state_->index_register, 0x300); // SuperChip does not increment I
 }
 
-TEST_F(Chip8OpcodeTest, OpFx65_LoadsRegistersFromMemory) {
+TEST_F(Chip8OpcodeTest, OpFx55_StoresRegistersInMemory_CosmacVIP) {
+    state_->mode = emu::Mode::kCosmacVIP;
     state_->index_register = 0x300;
     for (int i = 0; i <= 5; i++) {
-        state_->memory[state_->index_register + i] =
-            static_cast<std::uint8_t>(i * 10);
+        state_->V[i] = static_cast<std::uint8_t>(i * 10);
+    }
+
+    emu::instruction_set::opFx55(*state_, 0xF555);
+
+    for (int i = 0; i <= 5; i++) {
+        EXPECT_EQ(state_->memory[0x300 + i], i * 10);
+    }
+    EXPECT_EQ(state_->index_register, 0x300 + 5 + 1); // Cosmac VIP increments I
+}
+
+TEST_F(Chip8OpcodeTest, OpFx65_LoadsRegistersFromMemory_SuperChip) {
+    state_->mode = emu::Mode::kSuperChip;
+    state_->index_register = 0x300;
+    for (int i = 0; i <= 5; i++) {
+        state_->memory[0x300 + i] = static_cast<std::uint8_t>(i * 10);
     }
 
     emu::instruction_set::opFx65(*state_, 0xF565);
@@ -556,6 +607,22 @@ TEST_F(Chip8OpcodeTest, OpFx65_LoadsRegistersFromMemory) {
     for (int i = 0; i <= 5; i++) {
         EXPECT_EQ(state_->V[i], i * 10);
     }
+    EXPECT_EQ(state_->index_register, 0x300); // SuperChip does not increment I
+}
+
+TEST_F(Chip8OpcodeTest, OpFx65_LoadsRegistersFromMemory_CosmacVIP) {
+    state_->mode = emu::Mode::kCosmacVIP;
+    state_->index_register = 0x300;
+    for (int i = 0; i <= 5; i++) {
+        state_->memory[0x300 + i] = static_cast<std::uint8_t>(i * 10);
+    }
+
+    emu::instruction_set::opFx65(*state_, 0xF565);
+
+    for (int i = 0; i <= 5; i++) {
+        EXPECT_EQ(state_->V[i], i * 10);
+    }
+    EXPECT_EQ(state_->index_register, 0x300 + 5 + 1); // Cosmac VIP increments I
 }
 
 }  // namespace emu::instruction_set::test

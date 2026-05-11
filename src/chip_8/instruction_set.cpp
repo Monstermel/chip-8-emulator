@@ -6,9 +6,9 @@
 
 #include "chip_8/display.hpp"
 #include "chip_8/error.hpp"
+#include "chip_8/font.hpp"
 #include "chip_8/keyboard.hpp"
 #include "chip_8/utility.hpp"
-#include "chip_8/font.hpp"
 
 namespace emu::instruction_set {
 
@@ -32,12 +32,7 @@ void op00E0(ChipState& state, const std::uint16_t /* not used */) {
 }
 
 void op00EE(ChipState& state, const std::uint16_t /* not used */) {
-    if (state.stack_pointer == 0) {
-        throw StackUnderflowError("Stack underflow on RET");
-    }
-
-    state.stack_pointer--;
-    state.program_counter = state.stack[state.stack_pointer];
+    state.program_counter = state.stack.pop();
 }
 
 void op00FB(ChipState& state, const std::uint16_t /* not used */) {
@@ -85,12 +80,7 @@ void op1nnn(ChipState& state, const std::uint16_t bytecode) {
 }
 
 void op2nnn(ChipState& state, const std::uint16_t bytecode) {
-    if (state.stack_pointer >= ChipState::kStackSize) {
-        throw StackOverflowError("Stack overflow on CALL");
-    }
-
-    state.stack[state.stack_pointer] = state.program_counter;
-    state.stack_pointer++;
+    state.stack.push(state.program_counter);
     state.program_counter = getAddress(bytecode);
 }
 
@@ -161,8 +151,12 @@ void op8xy5(ChipState& state, const std::uint16_t bytecode) {
 void op8xy6(ChipState& state, const std::uint16_t bytecode) {
     const auto kNibbleX = getNibbleX(bytecode);
 
-    const auto kTemp = static_cast<unsigned int>(state.V[kNibbleX]);
+    if (state.mode == Mode::kCosmacVIP) {
+        // Original behavior: Store vy into vx before shift
+        state.V[kNibbleX] = state.V[getNibbleY(bytecode)];
+    }
 
+    const auto kTemp = static_cast<unsigned int>(state.V[kNibbleX]);
     state.V[0xF] = static_cast<std::uint8_t>(kTemp & 0x1U);
     state.V[kNibbleX] >>= 1U;
 }
@@ -181,6 +175,11 @@ void op8xy7(ChipState& state, const std::uint16_t bytecode) {
 void op8xyE(ChipState& state, const std::uint16_t bytecode) {
     const auto kNibbleX = getNibbleX(bytecode);
 
+    if (state.mode == Mode::kCosmacVIP) {
+        // Original behavior: Store vy into vx before shift
+        state.V[kNibbleX] = state.V[getNibbleY(bytecode)];
+    }
+
     const auto kResult = static_cast<unsigned int>(state.V[kNibbleX]) << 1U;
 
     state.V[0xF] = static_cast<std::uint8_t>((kResult & 0x100U) >> kByteWidth);
@@ -198,7 +197,14 @@ void opAnnn(ChipState& state, const std::uint16_t bytecode) {
 }
 
 void opBnnn(ChipState& state, const std::uint16_t bytecode) {
-    state.program_counter = getAddress(bytecode) + state.V[0];
+    if (state.mode == Mode::kCosmacVIP) {
+        // Original behavior: Add V0 to address
+        state.program_counter = getAddress(bytecode) + state.V[0];
+    } else {
+        // Super behavior: Add Vx to address
+        state.program_counter =
+            getAddress(bytecode) + state.V[getNibbleX(bytecode)];
+    }
 }
 
 void opCxkk(ChipState& state, const std::uint16_t bytecode) {
@@ -350,18 +356,36 @@ void opFx33(ChipState& state, const std::uint16_t bytecode) {
 void opFx55(ChipState& state, const std::uint16_t bytecode) {
     const auto kNibbleX = getNibbleX(bytecode);
 
-    for (int idx = state.index_register, rgs = 0; rgs <= kNibbleX;
-         idx++, rgs++) {
-        state.memory[idx] = state.V[rgs];
+    if (state.mode == Mode::kCosmacVIP) {
+        // Original behavior: Update [I] after each store
+        for (int rgs = 0; rgs <= kNibbleX; rgs++) {
+            state.memory[state.index_register] = state.V[rgs];
+            state.index_register++;
+        }
+    } else {
+        // Super behavior: Don't update [I] after each store
+        for (int idx = state.index_register, rgs = 0; rgs <= kNibbleX;
+             idx++, rgs++) {
+            state.memory[idx] = state.V[rgs];
+        }
     }
 }
 
 void opFx65(ChipState& state, const std::uint16_t bytecode) {
     const auto kNibbleX = getNibbleX(bytecode);
 
-    for (int idx = state.index_register, rgs = 0; rgs <= kNibbleX;
-         idx++, rgs++) {
-        state.V[rgs] = state.memory[idx];
+    if (state.mode == Mode::kCosmacVIP) {
+        // Original behavior: Update [I] after each load
+        for (int rgs = 0; rgs <= kNibbleX; rgs++) {
+            state.V[rgs] = state.memory[state.index_register];
+            state.index_register++;
+        }
+    } else {
+        // Super behavior: Don't update [I] after each load
+        for (int idx = state.index_register, rgs = 0; rgs <= kNibbleX;
+             idx++, rgs++) {
+            state.V[rgs] = state.memory[idx];
+        }
     }
 }
 

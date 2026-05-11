@@ -10,3 +10,7 @@ A small, portable Chip-8 emulator written in C++ using SDL. This repository cont
 - Configurable instruction speed and window resolution
 
 ## TODO
+
+- Clear all clang-tidy warnings
+- Run against sanitizers
+- Review cmake code
